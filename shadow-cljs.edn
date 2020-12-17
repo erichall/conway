@@ -1,0 +1,18 @@
+{:source-paths ["src" "test"]
+
+ :dependencies [[org.clojure/core.async "0.4.500"]
+                [reagent "0.9.0"]]
+
+ :dev-http     {3449 "resources/public/"}
+
+ :builds       {:app  {:output-dir "resources/public/"
+                       :asset-path "."
+                       :target     :browser
+                       :modules    {:main {:init-fn conways-game-of-life.core/init!}}
+                       :devtools   {:after-load conways-game-of-life.core/reload!}}
+
+                :test {:target    :node-test
+                       :output-to "out/node-tests.js"
+                       :runner-ns conways-game-of-life.test-all ;; TODO
+                       :main      conways-game-of-life.test-all/init
+                       }}}
