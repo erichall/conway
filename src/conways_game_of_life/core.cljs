@@ -277,13 +277,13 @@
 (defn init! [] (render (get-state app-state-atom)))
 (defn reload! [] (render (get-state app-state-atom)))
 
+
 (comment
   (let [a (for [x [-1 0 1]
                 y [-1 0 1]
                 :when (not (and (= x 0) (= y 0)))]
             [x y]
             )]
-    (println a)
     )
 
   (-> (get-state app-state-atom)

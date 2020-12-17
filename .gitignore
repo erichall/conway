@@ -16,3 +16,4 @@ dev/
 .shadow-cljs/
 .idea/
 conways-game-of-life.iml
+resources
