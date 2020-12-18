@@ -4,9 +4,11 @@
     [reagent.core :as r]
     [reagent.dom :as rd]))
 
-;(enable-console-print!)
-
-(def blinker [[1 0] [1 1] [1 2]])
+(def blinker #{[1 0] [1 1] [1 2]})
+(def shapes {
+             :blinker #{[1 0] [1 1] [1 2]}
+             :glider  #{[0 0] [2 0] [1 1] [1 2] [2 1]}
+             })
 
 (defn vec2d
   [rows cols init]
@@ -39,27 +41,21 @@
                    (assoc state :grid))]
     (assoc state :seed @seed-atom)))
 
-
 (defn set-initial-shape
   [grid shape]
   (reduce (fn [grid [x y]]
             (assoc-in grid [y x :cell-state] 1)) grid shape))
 
 (defonce app-state-atom (atom nil))
-(def grid-size 50)
+(def grid-size 10)
 (def initial-state
   {:states [{:cell-size     30                              ;; px
              :grid-size     grid-size
-             :grid          (-> (vec2d (/ grid-size 2) (/ grid-size 2)
-                                       (fn [x y]
-                                         {:x          x
-                                          :y          y
-                                          :cell-state 0     ;; 0 = dead, 1 = alive
-                                          }))
-                                (set-initial-shape blinker))
+             :grid          (:glider shapes)
              :seed          1
              :initial-seed? false
              :running?      false
+             :toroidal?     true
              }]})
 
 (defn get-state
@@ -72,11 +68,8 @@
 (defn px [v] (str v "px"))
 
 (defn wrap
-  [a max-a]
-  (cond
-    (< a 0) (- max-a a 1)
-    (> a max-a) (mod a (inc max-a))
-    :else a))
+  [a size]
+  (mod (+ a size) size))
 
 (defn neighbours
   "Find the 8 members of a given x,y coordinates.
@@ -87,13 +80,14 @@
    XXX
 
    "
-  [grid x y]
-  (let [rows (-> grid count dec)
-        cols (-> grid first count dec)]
-    (for [i (range (dec y) (+ 2 y))
-          j (range (dec x) (+ 2 x))
-          :when (not (and (= i y) (= j x)))]
-      [(wrap i rows) (wrap j cols)])))
+  [{:keys [grid-size toroidal?]} [x y]]
+  (let [size (/ grid-size 2)]
+    (for [dx [-1 0 1]
+          dy [-1 0 1]
+          :when (not (= [0 0] [dx dy]))]
+      (if toroidal?
+        [(wrap (+ dx x) size) (wrap (+ dy y) size)]
+        [(+ dx x) (+ dy y)]))))
 
 (defn alive?
   [cell-state]
@@ -104,21 +98,23 @@
   (= 0 cell-state))
 
 (defn world
-  [{:keys [state]}]
+  [{:keys [state trigger-event]}]
   (let [{:keys [grid grid-size cell-size]} state]
     [:div {:style {:display               "inline-grid"
                    :grid-gap              "1px"
                    :grid-template-columns (str "repeat(" (int (/ grid-size 2)) "," cell-size "px)")
                    :background-color      "white"
                    :border                "1px solid black"}}
-     (map (fn [{:keys [cell-state x y]}]
-            [:div {:key   (str "cell-" x "-" y)
-                   :style {:outline    ".5px solid lightgray"
-                           :display    "inline-block"
-                           :margin     "0px"
-                           :background (if (alive? cell-state) "black" "white")
-                           :min-width  (px cell-size)
-                           :min-height (px cell-size)}}]) (flatten grid))]))
+     (for [y (range (/ grid-size 2))
+           x (range (/ grid-size 2))]
+       [:div {:key      (str "cell-" x "-" y)
+              :on-click (fn [] (trigger-event :toggle-cell {:cell [x y]}))
+              :style    {:outline    ".5px solid lightgray"
+                         :display    "inline-block"
+                         :margin     "0px"
+                         :background (if (grid [x y]) "black" "white")
+                         :min-width  (px cell-size)
+                         :min-height (px cell-size)}}])]))
 
 (defn mutate!
   [app-state-atom pure-fn & mutate-args]
@@ -140,70 +136,24 @@
     [:button {:on-click (fn [] (trigger-event :tick))} "tick"]
     [:button {:on-click (fn [] (trigger-event :start))} "start"]
     [:button {:on-click (fn [] (trigger-event :stop))} "stop"]]
-   [world {:state state}]
-   ])
+   [world {:state         state
+           :trigger-event trigger-event}]])
 
-(defn neighbours->cell-states
-  [grid neighbours]
-  (mapv (fn [[x y]] (-> (get-in grid [y x]) :cell-state)) neighbours))
-
-(defn four-rule
-  "
-  Any live cell with fewer than two live neighbours dies, as if by underpopulation.
-  Any live cell with two or three live neighbours lives on to the next generation.
-  Any live cell with more than three live neighbours dies, as if by overpopulation.
-  Any dead cell with exactly three live neighbours becomes a live cell, as if by reproduction.
-  "
-  [grid cell]
-  (let [{:keys [x y cell-state]} cell
-        cell-states-sum (->> (neighbours grid x y)
-                             (neighbours->cell-states grid)
-                             (apply +)
-                             )]
-    (cond
-      ;; solitude
-      (and (alive? cell-state)
-           (< cell-states-sum 2)) (assoc cell :cell-state 0)
-
-      ;; overpopulation
-      (and (alive? cell-state)
-           (> cell-states-sum 3)) (assoc cell :cell-state 0)
-
-      (and (alive? cell-state)
-           (or (= cell-states-sum 2)
-               (= cell-states-sum 3))) cell
-
-      (and (dead? cell-state)
-           (= cell-states-sum 3)) (assoc cell :cell-state 1)
-
-      :else cell)))
+(defn inc-grid
+  [{:keys [grid] :as state}]
+  (-> (for [[loc n-neighbours] (->> grid
+                                    (mapcat (partial neighbours state))
+                                    frequencies)
+            :when (or (= n-neighbours 3)                    ;; bring back to life
+                      (and (= n-neighbours 2) (grid loc)))] ;; it's alive with 2 bros
+        loc))
+  set)
 
 (defn tick
-  "
-   if the sum of all nine fields in a given neighbourhood is three, the inner field state for the next generation will be life;
-   if the all-field sum is four, the inner field retains its current state;
-   and every other sum sets the inner field to death.
-   "
-  [{:keys [seed grid] :as state}]
-  (let [state (->> (mapv (fn [i]
-                           (mapv (fn [{:keys [x y cell-state] :as cell}]
-                                   (let [cell-states-sum (->> (neighbours grid x y)
-                                                              (neighbours->cell-states grid)
-                                                              (apply +)
-                                                              )]
-
-                                     ;(println cell-states-sum)
-                                     (condp = cell-states-sum
-                                       3 (assoc cell :cell-state 1)
-                                       4 cell
-                                       (assoc cell :cell-state 0)
-                                       )
-                                     ;(four-rule grid cell)
-
-                                     )) i)) grid)
+  [{:keys [seed] :as state}]
+  (let [state (->> (inc-grid state)
                    (assoc state :grid))]
-    (assoc state :seed (next-seed seed 1))
-    ))
+    (assoc state :seed (next-seed seed 1))))
 
 (defonce render-atom (atom nil))
 (when (nil? @render-atom)
@@ -232,7 +182,6 @@
 
                          )
 
-
                        (mutate! app-state-atom tick)
                        )
                      )
@@ -248,9 +197,11 @@
      :start (mutate! app-state-atom (fn [state]
                                       (let [state (assoc state :running? true)]
                                         (js/requestAnimationFrame simulate)
-                                        state
-                                        )
-                                      ))
+                                        state)))
+     :toggle-cell (mutate! app-state-atom (fn [{:keys [grid] :as state}]
+                                            (let [cell (:cell data)]
+                                              (update-in state [:grid] (if (grid cell) disj conj) cell)
+                                              )))
      :stop (mutate! app-state-atom (fn [state] (assoc state :running? false)))
      nil))
   ([name] (handle-event! name nil)))
@@ -283,8 +234,11 @@
                 y [-1 0 1]
                 :when (not (and (= x 0) (= y 0)))]
             [x y]
-            )]
+            )
+        bb #{[1 1] [0 0]}]
+    (bb [1])
     )
+
 
   (-> (get-state app-state-atom)
       :grid
