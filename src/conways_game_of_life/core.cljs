@@ -47,7 +47,7 @@
             (assoc-in grid [y x :cell-state] 1)) grid shape))
 
 (defonce app-state-atom (atom nil))
-(def grid-size 10)
+(def grid-size 100)
 (def initial-state
   {:states [{:cell-size     30                              ;; px
              :grid-size     grid-size
@@ -141,13 +141,13 @@
 
 (defn inc-grid
   [{:keys [grid] :as state}]
-  (-> (for [[loc n-neighbours] (->> grid
+  (-> (for [[cell n-neighbours] (->> grid
                                     (mapcat (partial neighbours state))
                                     frequencies)
             :when (or (= n-neighbours 3)                    ;; bring back to life
-                      (and (= n-neighbours 2) (grid loc)))] ;; it's alive with 2 bros
-        loc))
-  set)
+                      (and (= n-neighbours 2) (grid cell)))] ;; it's alive with 2 bros
+        cell)
+      set))
 
 (defn tick
   [{:keys [seed] :as state}]
