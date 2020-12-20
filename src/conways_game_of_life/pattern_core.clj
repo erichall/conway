@@ -64,43 +64,91 @@
            (is (= (rle-pattern "#C This is a glider.\nx = 3, y = 3\nbo$2bo$3o!\n")
                   "bo$2bo$3o!")))}
   [rle]
-  (loop [lines (s/split-lines rle)]
+  (loop [lines (s/split-lines rle)
+         pattern ""]
     (if (empty? lines)
-      nil
+      pattern
       (let [line (first lines)]
         (if (or (s/starts-with? line "#") (is-header? line))
-          (recur (rest lines))
-          line)))))
+          (recur (rest lines) pattern)
+          (recur (rest lines) (str pattern line)))))))
 
 (defn decode-pattern
   "Decode a rle pattern"
   {:test (fn []
+           (is (= (decode-pattern "bo$2bo$3o")
+                  "bo$bbo$ooo"))
            (is (= (decode-pattern "12W1B12W3B24W1B14W")
                   "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWBWWWWWWWWWWWWWW")))}
   [pattern]
-  (loop [pattern (split-but-keep pattern "\\d+")
+  (loop [pattern (->> (split-but-keep pattern "\\d+")
+                      (mapv (fn [p] (if (is-digit? p)
+                                      p
+                                      (s/split p #""))))
+                      (reduce (fn [acc p]
+                                (if (vector? p)
+                                  (into [] (concat acc p))
+                                  (conj acc p))) []))
          decode ""
-         c 0]
+         run-count 0]
     (if (empty? pattern)
       decode
       (let [p (first pattern)]
         (if (is-digit? p)
           (recur (rest pattern) decode (parse-int p))
-          (let [rep-c (repeat-str (first p) (max 1 c))]
-            (if (> 1 (count p))
-              (recur (cons (s/join (rest p)) pattern) (str decode rep-c) 0)
-              (recur (rest pattern) (str decode rep-c) 0))))))))
+          (let [tag (first (s/trim p))
+                rep-c (repeat-str tag (max 1 run-count))]
+            (recur (rest pattern) (str decode rep-c) 0)))))))
 
-;; $	end of line
+(decode-pattern "bo$2bo$3o!")
+
+(is-digit? "$")
+(> (count "$") 1)
+(rest '("$" "o$" "bo$" "2" "bo$" "3" "o!"))
+
+(->> (split-but-keep "bo$20bo$3o" "\\d+")
+     (mapv (fn [p] (if (is-digit? p)
+                     p
+                     (s/split p #""))))
+     (reduce (fn [acc p]
+               (if (vector? p)
+                 (into [] (concat acc p))
+                 (conj acc p)
+                 )
+               ) [])
+     )
+
+
+(s/split "abc" #"")
+
+; b	dead cell
+; o	alive cell
+; $	end of line
+;; x.x
+;; xx.
+;; ...
+;; [1 0], [2 1] [0 2] [1 2] [2 2]
 (defn rle-pattern->coords
   "Converts a rle encoded string into a set of coordinates for living cells."
   {:test (fn []
            (is (= (rle-pattern->coords "#C This is a glider.\nx = 3, y = 3\nbo$2bo$3o!\n")
-                  #{[0 0] [2 0] [1 1] [1 2] [2 1]}))
+                  #{[1 0] [2 1] [0 2] [1 2] [2 2]}))
            )}
   [rle]
-  (let [pattern (rle-pattern rle)]
+  (let [patterns (-> (rle-pattern rle)
+                     decode-pattern
+                     (s/split #"\$"))]
+    (->>
+      (count patterns)
+      range
+      (mapv vector patterns)
+      (reduce (fn [acc [line i]]
+                (concat acc (keep-indexed (fn [j c]
+                                            (when (= (str c) "o")
+                                              [j i]))
+                                          line))) [])
+      set)))
 
-    )
 
-  )
+
+(rle-pattern->coords "o$b2o$2o19$8bo$6bobo$7b2o19$13bobo$14b2o$14bo17$24bo$23b3o$23bob2o$24b\no2bo$25b2o$25bo2$22b2o$21bo2$20bobo2bo$20bob3obo$19b3ob2obo$20bobo$20b\n3o$21bo8$29bo$27bobo$28b2o19$34bobo$35b2o$35bo!")
