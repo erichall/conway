@@ -1,13 +1,6 @@
 (ns conways-game-of-life.canvas-core
   (:require [cljs.core.async :as a]))
 
-(defonce canvas-atom (atom nil))
-(def initial-state {:width  500
-                    :height 500})
-
-(when (nil? @canvas-atom)
-  (reset! canvas-atom initial-state))
-
 (defn add-event!
   [canvas event-name]
   (let [chan (a/chan)]
@@ -43,26 +36,29 @@
 (defn draw-cell!
   [{:keys [ctx size cell fill-color batch?]}]
   (let [[x y] cell]
+
     ;; batch??
     (when-not batch?
       (.beginPath ctx))
 
-    (.rect ctx x y size size)
+    ;(println x y)
     (set! (.-fillStyle ctx) fill-color)
+    ;(println x y)
+    (.fillRect ctx x y size size)
 
     ;; batch??
     (when-not batch?
       (.fill ctx))
 
     ;(set! (.-lineWidth ctx) 0.5)
-    ;(set! (.-strokeStyle ctx) "black")
-    ;(.stroke ctx)
+    ;(set! (.-strokeStyle ctx) "gray")
     ))
 
 (defn draw-cells!
   [{:keys [size cell-color-fn ctx] :as args}]
 
   (.beginPath ctx)
+
   (doall
     (for [cell (:cells args)
           :let [canvas-cell (mapv #(* size %) cell)]]
@@ -70,24 +66,66 @@
                       (assoc :batch true)
                       (assoc :fill-color (cell-color-fn cell))))))
 
+  (.stroke ctx)
   (.fill ctx)
   )
 
 ;(defn set-canvas-height! [canvas h] (set! (.-height canvas) h))
 ;(defn set-canvas-width! [canvas w] (set! (.-width canvas) w))
 
-(defn draw-grid!
-  [{:keys [width height context cell-size cell-color-fn]}]
-  (set! (.-height (:canvas context)) (+ 1 (* height cell-size)))
-  (set! (.-width (:canvas context)) (+ 1 (* width cell-size)))
+(defn draw-grid-lines!
+  [{:keys [ctx width height cell-size]}]
+
+  (set! (.-lineWidth ctx) 0.5)
+  (set! (.-strokeStyle ctx) "gray")
 
   (doall
-    (for [y (range height)
-          x (range width)]
-      (draw-cell! {:ctx        (:ctx context)
-                   :cell       [(* cell-size x) (* cell-size y)]
-                   :size       cell-size
-                   :fill-color (cell-color-fn [x y])}))))
+    (for [x (range (Math/ceil (/ width cell-size)))]
+      (do
+        (.beginPath ctx)
+        (.moveTo ctx (* x cell-size) 0)
+        (.lineTo ctx (* x cell-size) height)
+        (.stroke ctx))))
+
+  (doall
+    (for [y (range (Math/ceil (/ height cell-size)))]
+      (do
+        (.beginPath ctx)
+        (.moveTo ctx 0 (* y cell-size))
+        (.lineTo ctx width (* y cell-size))
+        (.stroke ctx)
+        )
+      )
+    )
+
+  )
+
+(defn draw-grid!
+  [{:keys [width height context cell-size cell-color-fn]}]
+
+  (let [height (+ 0 height)
+        width (+ 0 width)]
+
+
+    (set! (.-height (:canvas context)) height)
+    (set! (.-width (:canvas context)) width)
+
+    (.translate (:ctx context) 0.5 0.5)
+
+    (doall
+      (for [y (range height)
+            x (range width)]
+
+        (draw-cell! {:ctx        (:ctx context)
+                     :cell       [(* cell-size x) (* cell-size y)]
+                     :size       cell-size
+                     :fill-color (cell-color-fn [x y])})))
+
+    (draw-grid-lines! {:ctx       (:ctx context)
+                       :width     width
+                       :height    height
+                       :cell-size cell-size}))
+  )
 
 
 (defn xy->cell

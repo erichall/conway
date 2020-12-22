@@ -5,6 +5,8 @@
     [reagent.core :as r]
     [reagent.dom :as rd]))
 
+(enable-console-print!)
+
 (def blinker #{[1 0] [1 1] [1 2]})
 (def shapes {
              :blinker       #{[1 0] [1 1] [1 2]}
@@ -259,16 +261,17 @@
   (if (grid [x y]) "black" "white"))
 
 (defonce app-state-atom (atom nil))
-(def grid-size 750)
+(def grid-size 100)
 (def initial-state
-  {:states [{:cell-size     4                               ;; px
+  {:states [{:cell-size     10                              ;; px
              :grid-size     grid-size
-             :grid          (:heavy shapes)
+             :grid          (:144p24 shapes)
              :canvas-id     "conway-canvas"
              :seed          1
              :initial-seed? false
              :running?      false
              :toroidal?     true
+             :fps           0
              }]})
 
 (defn get-state
@@ -277,7 +280,6 @@
       :states
       last))
 
-(defn pprint-grid [grid] (cljs.pprint/pprint grid))
 (defn px [v] (str v "px"))
 
 (defn wrap
@@ -348,7 +350,9 @@
     [:button {:on-click (fn [] (trigger-event :seed))} "seed"]
     [:button {:on-click (fn [] (trigger-event :tick))} "tick"]
     [:button {:on-click (fn [] (trigger-event :start))} "start"]
-    [:button {:on-click (fn [] (trigger-event :stop))} "stop"]]
+    [:button {:on-click (fn [] (trigger-event :stop))} "stop"]
+    [:span {:style {:margin-left "20px"}} (:fps state) " fps"]
+    ]
    ;[world {:state         state
    ;        :trigger-event trigger-event}]
    ])
@@ -369,33 +373,29 @@
                    (assoc state :grid))]
     (assoc state :seed (next-seed seed 1))))
 
+(defn running?
+  [app-state-atom]
+  (:running? (get-state app-state-atom)))
+
 (defonce render-atom (atom nil))
 (when (nil? @render-atom)
   (reset! render-atom {:last-timestamp 0
-                       :x-sec          0
-                       :delta          0
                        :fps            0
                        }))
 
 (defn simulate
-  [trigger-event]
-  (let [id (atom nil)]
-    (reset! id (js/requestAnimationFrame
-                 (fn h [timestamp]
-                   (when (:running? (get-state app-state-atom))
+  ([trigger-event timestamp]
+   (when (running? app-state-atom)
 
-                     (reset! id (js/requestAnimationFrame h))
+     (swap! render-atom (fn [state]
+                          (let [seconds-passed (/ (- timestamp (:last-timestamp @render-atom)) 1000)]
+                            (-> (assoc state :last-timestamp timestamp)
+                                (assoc :fps (Math/round (/ 1 seconds-passed)))))))
 
-                     (when (>= (- timestamp (:last-timestamp @render-atom))
-                               (:x-sec @render-atom))
-
-                       (let [delta (/ (- timestamp (:last-timestamp @render-atom))
-                                      1000)]
-                         (swap! render-atom assoc :last-timestamp timestamp)
-                         (swap! render-atom assoc :delta (/ 1 delta))
-
-                         )
-                       (trigger-event :tick))))))))
+     (trigger-event :tick {:fps (:fps @render-atom)})
+     (js/requestAnimationFrame (fn [timestamp] (simulate trigger-event timestamp)))
+     ))
+  ([trigger-event] (simulate trigger-event 0)))
 
 (defn handle-event!
   ([name data]
@@ -408,12 +408,13 @@
                                                        :cells         (clojure.set/union grid prev-grid)
                                                        :size          cell-size
                                                        :cell-color-fn (fn [cell] (cell-color next-state cell))})
-                                       next-state)))
+                                       (if (:fps data)
+                                         (assoc next-state :fps (:fps data))
+                                         next-state)
+                                       )))
      :seed (mutate! app-state-atom seed-grid)
-     :start (mutate! app-state-atom (fn [state]
-                                      (let [state (assoc state :running? true)]
-                                        (js/requestAnimationFrame (fn [] (simulate handle-event!)))
-                                        state)))
+     :start (do (mutate! app-state-atom (fn [state] (assoc state :running? true)))
+                (simulate handle-event!))
      :toggle-cell (mutate! app-state-atom (fn [{:keys [grid] :as state}]
                                             (let [cell (:cell data)]
                                               (update-in state [:grid] (if (grid cell) disj conj) cell)
@@ -452,6 +453,7 @@
   (let [{:keys [canvas] :as context} (c/get-canvas-context "conway-canvas")
         handler (canvas-handler! context)
         {:keys [grid-size cell-size]} (get-state app-state-atom)]
+    (println "EEEEEEEEEEE" (/ grid-size 2))
     (c/draw-grid! {:width         (/ grid-size 2)
                    :height        (/ grid-size 2)
                    :context       context
