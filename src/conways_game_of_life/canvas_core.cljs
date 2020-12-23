@@ -41,10 +41,8 @@
     (when-not batch?
       (.beginPath ctx))
 
-    ;(println x y)
     (set! (.-fillStyle ctx) fill-color)
-    ;(println x y)
-    (.fillRect ctx x y size size)
+    (.fillRect ctx (+ 0.5 x) (+ 0.5 y) (- size 1) (- size 1))
 
     ;; batch??
     (when-not batch?
@@ -57,7 +55,7 @@
 (defn draw-cells!
   [{:keys [size cell-color-fn ctx] :as args}]
 
-  (.beginPath ctx)
+  ;(.beginPath ctx)
 
   (doall
     (for [cell (:cells args)
@@ -66,7 +64,7 @@
                       (assoc :batch true)
                       (assoc :fill-color (cell-color-fn cell))))))
 
-  (.stroke ctx)
+  ;(.stroke ctx)
   (.fill ctx)
   )
 
@@ -76,35 +74,33 @@
 (defn draw-grid-lines!
   [{:keys [ctx width height cell-size]}]
 
-  (set! (.-lineWidth ctx) 0.5)
+  (set! (.-lineWidth ctx) 1)
   (set! (.-strokeStyle ctx) "gray")
 
   (doall
-    (for [x (range (Math/ceil (/ width cell-size)))]
+    (for [x (range 0 width cell-size)]
       (do
-        (.beginPath ctx)
-        (.moveTo ctx (* x cell-size) 0)
-        (.lineTo ctx (* x cell-size) height)
-        (.stroke ctx))))
+        (.moveTo ctx x 0)
+        (.lineTo ctx x height)
+        (.stroke ctx)
+        )))
 
   (doall
-    (for [y (range (Math/ceil (/ height cell-size)))]
+    (for [y (range 0 height cell-size)]
       (do
-        (.beginPath ctx)
-        (.moveTo ctx 0 (* y cell-size))
-        (.lineTo ctx width (* y cell-size))
+        (.moveTo ctx 0 y)
+        (.lineTo ctx width y)
         (.stroke ctx)
         )
       )
     )
-
   )
 
 (defn draw-grid!
   [{:keys [width height context cell-size cell-color-fn]}]
 
-  (let [height (+ 0 height)
-        width (+ 0 width)]
+  (let [height (+ 1 height)
+        width (+ 1 width)]
 
 
     (set! (.-height (:canvas context)) height)
@@ -126,7 +122,6 @@
                        :height    height
                        :cell-size cell-size}))
   )
-
 
 (defn xy->cell
   [{:keys [cell-size x y]}]

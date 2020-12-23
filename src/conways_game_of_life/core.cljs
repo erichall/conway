@@ -261,11 +261,11 @@
   (if (grid [x y]) "black" "white"))
 
 (defonce app-state-atom (atom nil))
-(def grid-size 100)
+(def grid-size 50)
 (def initial-state
-  {:states [{:cell-size     10                              ;; px
+  {:states [{:cell-size     5                               ;; px
              :grid-size     grid-size
-             :grid          (:144p24 shapes)
+             :grid          (:blinker shapes)
              :canvas-id     "conway-canvas"
              :seed          1
              :initial-seed? false
@@ -453,7 +453,6 @@
   (let [{:keys [canvas] :as context} (c/get-canvas-context "conway-canvas")
         handler (canvas-handler! context)
         {:keys [grid-size cell-size]} (get-state app-state-atom)]
-    (println "EEEEEEEEEEE" (/ grid-size 2))
     (c/draw-grid! {:width         (/ grid-size 2)
                    :height        (/ grid-size 2)
                    :context       context
