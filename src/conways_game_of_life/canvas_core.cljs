@@ -137,3 +137,13 @@
           (.setAttribute canvas "height" height)
           (.setAttribute canvas "width" width)
           (.appendChild target canvas))))))
+
+;; _X_
+;; _X_
+;; _X_
+
+;; [0 1] => [0 0] [0 2] [1 0] [1 1] [1 2]
+;; [0 1] die, [0 0] k-die, [0 2] k-die, [1 0] alive, [1 1] k-alive [1 2] alive
+;; and then
+;; [1 1] => [0 0] [0 1] [0 2] [1 0] [1 2] [2 0] [2 1] [2 2]
+;;

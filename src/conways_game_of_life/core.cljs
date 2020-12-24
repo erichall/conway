@@ -261,11 +261,11 @@
   (if (grid [x y]) "black" "white"))
 
 (defonce app-state-atom (atom nil))
-(def grid-size 50)
+(def grid-size 500)
 (def initial-state
   {:states [{:cell-size     5                               ;; px
              :grid-size     grid-size
-             :grid          (:blinker shapes)
+             :grid          (:heavy shapes)
              :canvas-id     "conway-canvas"
              :seed          1
              :initial-seed? false
@@ -286,6 +286,9 @@
   [a size]
   (mod (+ a size) size))
 
+(def dx [-1 0 1])
+(def dy [-1 0 1])
+
 (defn neighbours
   "Find the 8 members of a given x,y coordinates.
    The grid is considered to be a toroidal so edges wraps around.
@@ -295,14 +298,13 @@
    XXX
 
    "
-  [{:keys [grid-size toroidal?]} [x y]]
-  (let [size (/ grid-size 2)]
-    (for [dx [-1 0 1]
-          dy [-1 0 1]
-          :when (not (= [0 0] [dx dy]))]
-      (if toroidal?
-        [(wrap (+ dx x) size) (wrap (+ dy y) size)]
-        [(+ dx x) (+ dy y)]))))
+  [size toroidal? [x y]]
+  (for [dx dx
+        dy dy
+        :when (not (= [0 0] [dx dy]))]
+    (if toroidal?
+      [(wrap (+ dx x) size) (wrap (+ dy y) size)]
+      [(+ dx x) (+ dy y)])))
 
 (defn alive?
   [cell-state]
@@ -358,14 +360,28 @@
    ])
 
 (defn inc-grid
-  [{:keys [grid] :as state}]
-  (-> (for [[cell n-neighbours] (->> grid
-                                     (mapcat (partial neighbours state))
-                                     frequencies)
-            :when (or (= n-neighbours 3)                    ;; bring back to life
-                      (and (= n-neighbours 2) (grid cell)))] ;; it's alive with 2 bros
-        cell)
-      set))
+  [{:keys [grid grid-size toroidal?] :as state}]
+  (let [size (/ grid-size 2)
+        neighbours (fn [cell] (neighbours size toroidal? cell))]
+    (-> (for [[cell n-neighbours] (->> grid
+                                       (mapcat neighbours)
+                                       frequencies)
+              :when (or (= n-neighbours 3)                  ;; bring back to life
+                        (and (= n-neighbours 2) (grid cell)))] ;; it's alive with 2 bros
+          cell)
+        set)))
+
+(defn fast-inc-grid
+  [{:keys [grid grid-size toroidal?] :as state}]
+  (let [size (/ grid-size 2)]
+    (loop [grid grid
+           n-checks #{}]
+      ;(if (empty? grid))
+      ;(let [area (neighbours size toroidal?)])
+
+      ))
+
+  )
 
 (defn tick
   [{:keys [seed] :as state}]
