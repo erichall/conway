@@ -27,11 +27,16 @@
 
 (defn get-canvas-context
   [id]
-  (let [canvas (.getElementById js/document id)]
-    {:canvas canvas
-     :width  (.-width canvas)
-     :height (.-height canvas)
-     :ctx    (.getContext canvas "2d" (clj->js "alpha" false))}))
+  (let [canvas (.getElementById js/document id)
+        w (.-width canvas)
+        h (.-height canvas)
+        ctx (.getContext canvas "2d" (clj->js "alpha" false))
+        ]
+    {:canvas     canvas
+     :width      w
+     :height     h
+     :image-data (js-invoke ctx "createImageData" w h)
+     :ctx        ctx}))
 
 (defn draw-cell!
   [{:keys [ctx size cell fill-color batch?]}]
@@ -53,19 +58,22 @@
     ))
 
 (defn draw-cells!
-  [{:keys [size cell-color-fn ctx] :as args}]
+  [{:keys [size cell-color-fn context] :as args}]
+  (let [ctx (:ctx context)]
 
-  ;(.beginPath ctx)
+    ;(.beginPath ctx)
+    (js/console.log (:image-data context))
 
-  (doall
-    (for [cell (:cells args)
-          :let [canvas-cell (mapv #(* size %) cell)]]
-      (draw-cell! (-> (assoc args :cell canvas-cell)
-                      (assoc :batch true)
-                      (assoc :fill-color (cell-color-fn cell))))))
+    (doall
+      (for [cell (:cells args)
+            :let [canvas-cell (mapv #(* size %) cell)]]
+        (draw-cell! (-> (assoc args :cell canvas-cell)
+                        (assoc :ctx ctx)
+                        (assoc :batch true)
+                        (assoc :fill-color (cell-color-fn cell))))))
 
-  ;(.stroke ctx)
-  (.fill ctx)
+    ;(.stroke ctx)
+    (.fill ctx))
   )
 
 ;(defn set-canvas-height! [canvas h] (set! (.-height canvas) h))
@@ -78,22 +86,25 @@
   (set! (.-strokeStyle ctx) "gray")
 
   (doall
-    (for [x (range 0 width cell-size)]
+    (for [x (range 0.5 width cell-size)]
       (do
         (.moveTo ctx x 0)
         (.lineTo ctx x height)
-        (.stroke ctx)
+        ;(.stroke ctx)
         )))
 
   (doall
-    (for [y (range 0 height cell-size)]
+    (for [y (range 0.5 height cell-size)]
       (do
         (.moveTo ctx 0 y)
         (.lineTo ctx width y)
-        (.stroke ctx)
+        ;(.stroke ctx)
         )
       )
     )
+
+
+  (.stroke ctx)
   )
 
 (defn draw-grid!
@@ -106,7 +117,7 @@
     (set! (.-height (:canvas context)) height)
     (set! (.-width (:canvas context)) width)
 
-    (.translate (:ctx context) 0.5 0.5)
+    ;(.translate (:ctx context) 0.5 0.5)
 
     (doall
       (for [y (range height)

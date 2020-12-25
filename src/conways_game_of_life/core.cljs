@@ -251,6 +251,12 @@
                    (assoc state :grid))]
     (assoc state :seed @seed-atom)))
 
+(defn canvas-worker
+  [canvas]
+  (let [worker (js/Worker. "worker.js")]
+    (.. worker (addEventListener "message" (fn [e] (js/console.log e))))
+    (.. worker (postMessage canvas))))
+
 (defn set-initial-shape
   [grid shape]
   (reduce (fn [grid [x y]]
@@ -263,7 +269,7 @@
 (defonce app-state-atom (atom nil))
 (def grid-size 500)
 (def initial-state
-  {:states [{:cell-size     5                               ;; px
+  {:states [{:cell-size     10                              ;; px
              :grid-size     grid-size
              :grid          (:heavy shapes)
              :canvas-id     "conway-canvas"
@@ -339,7 +345,9 @@
                           (let [current-state (last (:states app-state))
                                 next-state (apply pure-fn (conj mutate-args current-state))]
                             (if (some? next-state)
-                              (update app-state :states (fn [states] (conj states next-state)))
+                              ; (update app-state :states (fn [states] (conj states next-state)))
+                              (update app-state :states (fn [states] [next-state]))
+
                               app-state)))
          (get-state app-state-atom)))
 
@@ -371,18 +379,6 @@
           cell)
         set)))
 
-(defn fast-inc-grid
-  [{:keys [grid grid-size toroidal?] :as state}]
-  (let [size (/ grid-size 2)]
-    (loop [grid grid
-           n-checks #{}]
-      ;(if (empty? grid))
-      ;(let [area (neighbours size toroidal?)])
-
-      ))
-
-  )
-
 (defn tick
   [{:keys [seed] :as state}]
   (let [state (->> (inc-grid state)
@@ -397,7 +393,8 @@
 (when (nil? @render-atom)
   (reset! render-atom {:last-timestamp 0
                        :fps            0
-                       }))
+                       })
+  )
 
 (defn simulate
   ([trigger-event timestamp]
@@ -420,7 +417,7 @@
                                      (let [prev-grid (:grid state)
                                            {:keys [grid-size cell-size grid] :as next-state} (tick state)
                                            context (c/get-canvas-context (:canvas-id next-state))]
-                                       (c/draw-cells! {:ctx           (:ctx context)
+                                       (c/draw-cells! {:context       context
                                                        :cells         (clojure.set/union grid prev-grid)
                                                        :size          cell-size
                                                        :cell-color-fn (fn [cell] (cell-color next-state cell))})
@@ -463,6 +460,8 @@
 (when (nil? @app-state-atom)
   (reset! app-state-atom initial-state)
 
+  (init-worker)
+
   (when (:initial-seed? (get-state app-state-atom))
     (mutate! app-state-atom seed-grid))
 
@@ -496,19 +495,8 @@
 (defn reload! [] (render (get-state app-state-atom)))
 
 (comment
-  (let [a (for [x [-1 0 1]
-                y [-1 0 1]
-                :when (not (and (= x 0) (= y 0)))]
-            [x y]
-            )
-        bb #{[1 1] [0 0]}]
-    (bb [1])
+  (reset! app-state-atom initial-state)
+  ;; 1976.845000 msecs
+  (time (handle-event! :tick))
 
-    )
-
-
-  (-> (get-state app-state-atom)
-      :grid
-      (set-initial-shape blinker)
-      )
   )

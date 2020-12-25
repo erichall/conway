@@ -8,8 +8,19 @@
  :builds       {:app  {:output-dir "resources/public/"
                        :asset-path "."
                        :target     :browser
-                       :modules    {:main {:init-fn conways-game-of-life.core/init!}}
-                       :devtools   {:after-load conways-game-of-life.core/reload!}}
+                       :modules    {:shared
+                                    {:entries []}
+                                    :main
+                                    {:init-fn    conways-game-of-life.core/init!
+                                     :depends-on #{:shared}}
+                                    :worker
+                                    {:init-fn    conways-game-of-life.worker/init
+                                     :depends-on #{:shared}
+                                     :web-worker true}}
+                       :devtools   {:after-load     conways-game-of-life.core/reload!
+                                    :browser-inject :mod    ;; makes the webworker work... :O
+                                    }
+                       }
 
                 :test {:target    :node-test
                        :output-to "out/node-tests.js"
