@@ -253,9 +253,20 @@
 
 (defn canvas-worker
   [canvas]
-  (let [worker (js/Worker. "worker.js")]
-    (.. worker (addEventListener "message" (fn [e] (js/console.log e))))
-    (.. worker (postMessage canvas))))
+  (js/console.log "CCCCCCCC" canvas)
+  (let [worker (js/Worker. "worker.js")
+        chan (async/chan)
+        offscreen-canvas (.transferControlToOffscreen canvas)
+        ]
+    (js/console.log (js-obj "canvas" offscreen-canvas))
+    (.. worker (addEventListener "message" (fn [e]
+                                             (js/console.log "Master worker got -- " e)
+                                             (async/put! chan e)
+                                             )))
+    ;(.. worker (postMessage offscreen-canvas ) (array offscreen-canvas))
+    (js-invoke worker "postMessage" (js-obj "canvas" offscreen-canvas) (array offscreen-canvas))
+
+    chan))
 
 (defn set-initial-shape
   [grid shape]
@@ -416,15 +427,17 @@
      :tick (mutate! app-state-atom (fn [state]
                                      (let [prev-grid (:grid state)
                                            {:keys [grid-size cell-size grid] :as next-state} (tick state)
-                                           context (c/get-canvas-context (:canvas-id next-state))]
-                                       (c/draw-cells! {:context       context
-                                                       :cells         (clojure.set/union grid prev-grid)
-                                                       :size          cell-size
-                                                       :cell-color-fn (fn [cell] (cell-color next-state cell))})
+                                           context (c/get-canvas-context (:canvas-id next-state))
+                                           worker (canvas-worker (:canvas context))]
+                                       ;(c/draw-cells! {:context       context
+                                       ;                :cells         (clojure.set/union grid prev-grid)
+                                       ;                :size          cell-size
+                                       ;                :cell-color-fn (fn [cell] (cell-color next-state cell))})
                                        (if (:fps data)
                                          (assoc next-state :fps (:fps data))
                                          next-state)
-                                       )))
+                                       )
+                                     ))
      :seed (mutate! app-state-atom seed-grid)
      :start (do (mutate! app-state-atom (fn [state] (assoc state :running? true)))
                 (simulate handle-event!))
@@ -444,7 +457,7 @@
                                        (let [cell (c/xy->cell (merge (c/relative-cord (:canvas context) data)
                                                                      {:cell-size (:cell-size (get-state app-state-atom))}))
                                              state (update-in state [:grid] (if (grid cell) disj conj) cell)]
-                                         (c/draw-cell! {:ctx        (:ctx context)
+                                         (c/draw-cell! {:ctx        ((:get-ctx context))
                                                         :cell       (mapv #(* cell-size %) cell)
                                                         :size       cell-size
                                                         :fill-color (cell-color state cell)})
@@ -460,19 +473,17 @@
 (when (nil? @app-state-atom)
   (reset! app-state-atom initial-state)
 
-  (init-worker)
-
   (when (:initial-seed? (get-state app-state-atom))
     (mutate! app-state-atom seed-grid))
 
   (let [{:keys [canvas] :as context} (c/get-canvas-context "conway-canvas")
         handler (canvas-handler! context)
         {:keys [grid-size cell-size]} (get-state app-state-atom)]
-    (c/draw-grid! {:width         (/ grid-size 2)
-                   :height        (/ grid-size 2)
-                   :context       context
-                   :cell-size     cell-size
-                   :cell-color-fn (fn [cell] (cell-color (get-state app-state-atom) cell))})
+    ;(c/draw-grid! {:width         (/ grid-size 2)
+    ;               :height        (/ grid-size 2)
+    ;               :context       context
+    ;               :cell-size     cell-size
+    ;               :cell-color-fn (fn [cell] (cell-color (get-state app-state-atom) cell))})
     (c/canvas-handler handler [(c/add-event! canvas "click")]))
 
   (add-watch app-state-atom

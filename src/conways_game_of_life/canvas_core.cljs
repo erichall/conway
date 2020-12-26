@@ -30,13 +30,12 @@
   (let [canvas (.getElementById js/document id)
         w (.-width canvas)
         h (.-height canvas)
-        ctx (.getContext canvas "2d" (clj->js "alpha" false))
         ]
-    {:canvas     canvas
-     :width      w
-     :height     h
-     :image-data (js-invoke ctx "createImageData" w h)
-     :ctx        ctx}))
+    {:canvas  canvas
+     :width   w
+     :height  h
+     :get-ctx (fn []
+                (.getContext canvas "2d" (clj->js "alpha" false)))}))
 
 (defn draw-cell!
   [{:keys [ctx size cell fill-color batch?]}]
@@ -59,7 +58,7 @@
 
 (defn draw-cells!
   [{:keys [size cell-color-fn context] :as args}]
-  (let [ctx (:ctx context)]
+  (let [ctx ((:get-ctx context))]
 
     ;(.beginPath ctx)
     (js/console.log (:image-data context))
@@ -103,7 +102,6 @@
       )
     )
 
-
   (.stroke ctx)
   )
 
@@ -123,12 +121,12 @@
       (for [y (range height)
             x (range width)]
 
-        (draw-cell! {:ctx        (:ctx context)
+        (draw-cell! {:ctx        ((:get-ctx context))
                      :cell       [(* cell-size x) (* cell-size y)]
                      :size       cell-size
                      :fill-color (cell-color-fn [x y])})))
 
-    (draw-grid-lines! {:ctx       (:ctx context)
+    (draw-grid-lines! {:ctx       ((:get-ctx context))
                        :width     width
                        :height    height
                        :cell-size cell-size}))
