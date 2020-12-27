@@ -278,16 +278,17 @@
   (if (grid [x y]) "black" "white"))
 
 (defonce app-state-atom (atom nil))
-(def grid-size 500)
+(def grid-size 1000)
 (def initial-state
   {:states [{:cell-size     10                              ;; px
              :grid-size     grid-size
              :grid          (:heavy shapes)
+             ;:grid          (:blinker shapes)
              :canvas-id     "conway-canvas"
              :seed          1
              :initial-seed? false
              :running?      false
-             :toroidal?     true
+             :toroidal?     false
              :fps           0
              }]})
 
@@ -319,9 +320,10 @@
   (for [dx dx
         dy dy
         :when (not (= [0 0] [dx dy]))]
-    (if toroidal?
-      [(wrap (+ dx x) size) (wrap (+ dy y) size)]
-      [(+ dx x) (+ dy y)])))
+    (do
+      (if toroidal?
+        [(wrap (+ dx x) size) (wrap (+ dy y) size)]
+        [(+ dx x) (+ dy y)]))))
 
 (defn alive?
   [cell-state]
@@ -427,12 +429,13 @@
      :tick (mutate! app-state-atom (fn [state]
                                      (let [prev-grid (:grid state)
                                            {:keys [grid-size cell-size grid] :as next-state} (tick state)
-                                           context (c/get-canvas-context (:canvas-id next-state))
-                                           worker (canvas-worker (:canvas context))]
-                                       ;(c/draw-cells! {:context       context
-                                       ;                :cells         (clojure.set/union grid prev-grid)
-                                       ;                :size          cell-size
-                                       ;                :cell-color-fn (fn [cell] (cell-color next-state cell))})
+                                           context @c/canvas-atom
+                                           ;worker (canvas-worker (:canvas context))
+                                           ]
+                                       (c/draw-cells! {:context       context
+                                                       :cells         (clojure.set/union grid prev-grid)
+                                                       :size          cell-size
+                                                       :cell-color-fn (fn [cell] (cell-color next-state cell))})
                                        (if (:fps data)
                                          (assoc next-state :fps (:fps data))
                                          next-state)
@@ -441,11 +444,29 @@
      :seed (mutate! app-state-atom seed-grid)
      :start (do (mutate! app-state-atom (fn [state] (assoc state :running? true)))
                 (simulate handle-event!))
+     :stop (mutate! app-state-atom (fn [state] (assoc state :running? false)))
      :toggle-cell (mutate! app-state-atom (fn [{:keys [grid] :as state}]
                                             (let [cell (:cell data)]
                                               (update-in state [:grid] (if (grid cell) disj conj) cell)
                                               )))
-     :stop (mutate! app-state-atom (fn [state] (assoc state :running? false)))
+     :click (mutate! app-state-atom (fn [{:keys [grid cell-size] :as state}]
+                                      (let [context @c/canvas-atom
+                                            cell (c/xy->cell (merge (c/relative-cord (:canvas context) data)
+                                                                    {:cell-size (:cell-size (get-state app-state-atom))}))
+                                            state (update-in state [:grid] (if (grid cell) disj conj) cell)]
+                                        (c/draw-cell! {:ctx        ((:get-ctx context))
+                                                       :cell       (mapv #(* cell-size %) cell)
+                                                       :size       cell-size
+                                                       :fill-color (cell-color state cell)})
+                                        state)))
+     :initialize-canvas (let [{:keys [canvas] :as context} @c/canvas-atom
+                              {:keys [grid-size cell-size]} (get-state app-state-atom)]
+                          (c/draw-grid! {:width         (/ grid-size 2)
+                                         :height        (/ grid-size 2)
+                                         :context       context
+                                         :cell-size     cell-size
+                                         :cell-color-fn (fn [cell] (cell-color (get-state app-state-atom) cell))})
+                          (c/canvas-handler handle-event! [(c/add-event! canvas "click")]))
      nil))
   ([name] (handle-event! name nil)))
 
@@ -453,15 +474,7 @@
   [context]
   (fn [name data]
     (condp = name
-      :click (mutate! app-state-atom (fn [{:keys [grid cell-size] :as state}]
-                                       (let [cell (c/xy->cell (merge (c/relative-cord (:canvas context) data)
-                                                                     {:cell-size (:cell-size (get-state app-state-atom))}))
-                                             state (update-in state [:grid] (if (grid cell) disj conj) cell)]
-                                         (c/draw-cell! {:ctx        ((:get-ctx context))
-                                                        :cell       (mapv #(* cell-size %) cell)
-                                                        :size       cell-size
-                                                        :fill-color (cell-color state cell)})
-                                         state)))
+      :click
       nil)))
 
 (defn render
@@ -476,15 +489,7 @@
   (when (:initial-seed? (get-state app-state-atom))
     (mutate! app-state-atom seed-grid))
 
-  (let [{:keys [canvas] :as context} (c/get-canvas-context "conway-canvas")
-        handler (canvas-handler! context)
-        {:keys [grid-size cell-size]} (get-state app-state-atom)]
-    ;(c/draw-grid! {:width         (/ grid-size 2)
-    ;               :height        (/ grid-size 2)
-    ;               :context       context
-    ;               :cell-size     cell-size
-    ;               :cell-color-fn (fn [cell] (cell-color (get-state app-state-atom) cell))})
-    (c/canvas-handler handler [(c/add-event! canvas "click")]))
+  (handle-event! :initialize-canvas)
 
   (add-watch app-state-atom
              :game-loop
@@ -494,13 +499,6 @@
 
 (defn init! []
   (render (get-state app-state-atom))
-
-
-
-  ;(create-dom-canvas! 200 200 "game-of-life-canvas" (.getElementById js/document "app"))
-  ;(let [{:keys [ctx] :as c} (get-canvas-context-from-id "game-of-life-canvas")]
-  ;  (draw-grid! 30 30 c 30)
-  ;  )
   )
 
 (defn reload! [] (render (get-state app-state-atom)))

@@ -25,17 +25,17 @@
         (handler name data)
         (recur)))))
 
-(defn get-canvas-context
-  [id]
-  (let [canvas (.getElementById js/document id)
-        w (.-width canvas)
-        h (.-height canvas)
-        ]
-    {:canvas  canvas
-     :width   w
-     :height  h
-     :get-ctx (fn []
-                (.getContext canvas "2d" (clj->js "alpha" false)))}))
+(def canvas (.getElementById js/document "conway-canvas"))
+(defn- initial-state
+  {:canvas canvas
+   :width  (.-width canvas)
+   :height (.-height canvas)
+   :ctx    (.getContext canvas "2d" (clj->js "alpha" false))})
+(defonce canvas-atom (atom nil))
+
+(when (nil? @canvas-atom)
+  (reset! canvas-atom initial-state))
+
 
 (defn draw-cell!
   [{:keys [ctx size cell fill-color batch?]}]
@@ -109,27 +109,42 @@
   [{:keys [width height context cell-size cell-color-fn]}]
 
   (let [height (+ 1 height)
-        width (+ 1 width)]
+        width (+ 1 width)
+        canvas (:canvas context)
+        ctx ((:get-ctx context))]
 
+    (set! (.-height canvas) height)
+    (set! (.-width canvas) width)
 
-    (set! (.-height (:canvas context)) height)
-    (set! (.-width (:canvas context)) width)
+    (swap! canvas-atom (fn [state] (-> (assoc state :width width)
+                                       (assoc :height height))))
+
+    (set! (.-border (.-style canvas)) "dotted 1px blue")
 
     ;(.translate (:ctx context) 0.5 0.5)
 
-    (doall
-      (for [y (range height)
-            x (range width)]
+    ;;"Elapsed time: 1272.370000 msecs"
+    (.beginPath ctx)
 
-        (draw-cell! {:ctx        ((:get-ctx context))
-                     :cell       [(* cell-size x) (* cell-size y)]
-                     :size       cell-size
-                     :fill-color (cell-color-fn [x y])})))
+    (time
+      (doall
+        (for [y (range height)
+              x (range width)]
+
+          (draw-cell! {:ctx        ((:get-ctx context))
+                       :cell       [(* cell-size x) (* cell-size y)]
+                       :batch      true
+                       :size       cell-size
+                       :fill-color (cell-color-fn [x y])}))))
 
     (draw-grid-lines! {:ctx       ((:get-ctx context))
                        :width     width
                        :height    height
-                       :cell-size cell-size}))
+                       :cell-size cell-size})
+
+    (.fill ctx)
+    )
+
   )
 
 (defn xy->cell
@@ -147,12 +162,3 @@
           (.setAttribute canvas "width" width)
           (.appendChild target canvas))))))
 
-;; _X_
-;; _X_
-;; _X_
-
-;; [0 1] => [0 0] [0 2] [1 0] [1 1] [1 2]
-;; [0 1] die, [0 0] k-die, [0 2] k-die, [1 0] alive, [1 1] k-alive [1 2] alive
-;; and then
-;; [1 1] => [0 0] [0 1] [0 2] [1 0] [1 2] [2 0] [2 1] [2 2]
-;;
