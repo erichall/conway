@@ -253,12 +253,9 @@
 
 (defn canvas-worker
   [canvas]
-  (js/console.log "CCCCCCCC" canvas)
   (let [worker (js/Worker. "worker.js")
         chan (async/chan)
-        offscreen-canvas (.transferControlToOffscreen canvas)
-        ]
-    (js/console.log (js-obj "canvas" offscreen-canvas))
+        offscreen-canvas (.transferControlToOffscreen canvas)]
     (.. worker (addEventListener "message" (fn [e]
                                              (js/console.log "Master worker got -- " e)
                                              (async/put! chan e)
@@ -374,11 +371,7 @@
     [:button {:on-click (fn [] (trigger-event :tick))} "tick"]
     [:button {:on-click (fn [] (trigger-event :start))} "start"]
     [:button {:on-click (fn [] (trigger-event :stop))} "stop"]
-    [:span {:style {:margin-left "20px"}} (:fps state) " fps"]
-    ]
-   ;[world {:state         state
-   ;        :trigger-event trigger-event}]
-   ])
+    [:span {:style {:margin-left "20px"}} (:fps state) " fps"]]])
 
 (defn inc-grid
   [{:keys [grid grid-size toroidal?] :as state}]
@@ -405,9 +398,7 @@
 (defonce render-atom (atom nil))
 (when (nil? @render-atom)
   (reset! render-atom {:last-timestamp 0
-                       :fps            0
-                       })
-  )
+                       :fps            0}))
 
 (defn simulate
   ([trigger-event timestamp]
@@ -419,8 +410,7 @@
                                 (assoc :fps (Math/round (/ 1 seconds-passed)))))))
 
      (trigger-event :tick {:fps (:fps @render-atom)})
-     (js/requestAnimationFrame (fn [timestamp] (simulate trigger-event timestamp)))
-     ))
+     (js/requestAnimationFrame (fn [timestamp] (simulate trigger-event timestamp)))))
   ([trigger-event] (simulate trigger-event 0)))
 
 (defn handle-event!
@@ -438,9 +428,7 @@
                                                        :cell-color-fn (fn [cell] (cell-color next-state cell))})
                                        (if (:fps data)
                                          (assoc next-state :fps (:fps data))
-                                         next-state)
-                                       )
-                                     ))
+                                         next-state))))
      :seed (mutate! app-state-atom seed-grid)
      :start (do (mutate! app-state-atom (fn [state] (assoc state :running? true)))
                 (simulate handle-event!))
@@ -498,14 +486,11 @@
                )))
 
 (defn init! []
-  (render (get-state app-state-atom))
-  )
+  (render (get-state app-state-atom)))
 
 (defn reload! [] (render (get-state app-state-atom)))
 
 (comment
   (reset! app-state-atom initial-state)
   ;; 1976.845000 msecs
-  (time (handle-event! :tick))
-
-  )
+  (time (handle-event! :tick)))
