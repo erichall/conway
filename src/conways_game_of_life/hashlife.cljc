@@ -1,22 +1,24 @@
 (ns conways-game-of-life.hashlife
-  (:require [conways-game-of-life.quadtree :refer [make-node make-leaf]]))
+  (:require [conways-game-of-life.quadtree :as q]))
 
 (defn horizontal-forward
   [w e]
-  (make-node (:ne w) (:nw e) (:se w) (:sw e)))
+  (q/make-node (:ne w) (:nw e) (:se w) (:sw e)))
 
 (defn vertical-forward
   [n s]
-  (make-node (:sw n) (:se n) (:nw s) (:ne s)))
+  (q/make-node (:sw n) (:se n) (:nw s) (:ne s)))
 
 (defn center-forward
   [nw ne se sw]
-  (make-node (:se nw) (:sw ne) (:ne sw) (:nw se)))
+  (q/make-node (:se nw) (:sw ne) (:ne sw) (:nw se)))
 
 (defn next-generation
   [tree]
+  {:pre [(not (nil? tree))]}
+  (println (:depth tree))
   (cond
-    (= (:depth tree) 2) (println "WE SHOULD DO THE NAIVE NOW" tree)
+    (= (:depth tree) 2) tree
     :else
     (let [{:keys [nw ne se sw]} tree
           n00 (next-generation nw)
@@ -31,15 +33,28 @@
           n21 (-> (horizontal-forward se sw) next-generation)
           n22 (next-generation se)
 
-          t1 (-> (make-node n00 n01 n10 n11) next-generation)
-          t2 (-> (make-node n01 n02 n11 n12) next-generation)
-          t3 (-> (make-node n10 n11 n20 n21) next-generation)
-          t4 (-> (make-node n11 n12 n21 n22) next-generation)
+          t1 (-> (q/make-node n00 n01 n10 n11) next-generation)
+          t2 (-> (q/make-node n01 n02 n11 n12) next-generation)
+          t3 (-> (q/make-node n10 n11 n20 n21) next-generation)
+          t4 (-> (q/make-node n11 n12 n21 n22) next-generation)
 
-          center-node (make-node t1 t2 t3 t4)]
+          center-node (q/make-node t1 t2 t3 t4)
+          ]
 
       center-node
       )))
+
+(comment
+  (let [tree (q/empty-tree {:depth  3
+                            :bounds {:x 4 :y 4}})]
+    (-> (q/insert tree {:x 1 :y 0 :data {:alive? true}})
+        (q/insert {:x 0 :y 0 :data {:alive? true}})
+        (q/insert {:x 0 :y 1 :data {:alive? true}})
+        (q/insert {:x 1 :y 1 :data {:alive? true}})
+        next-generation
+        )
+    )
+  )
 
 ;; S1
 ;; ____x___________
