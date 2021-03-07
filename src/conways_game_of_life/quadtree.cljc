@@ -27,6 +27,11 @@
     :se         se
     :sw         sw}))
 
+(defn node
+  [bounds depth]
+  {:bounds bounds
+   :depth  depth})
+
 (defn bound-by-depth
   "Calculate the boundary from root node to a given depth"
   [root-bounds depth]
@@ -40,43 +45,107 @@
 (defn se? [^long b cell] (and (= b (:x cell)) (= b (:y cell))))
 (defn sw? [^long b cell] (and (= (- b 1) (:x cell)) (= b (:y cell))))
 
-(defn nw-split [bounds w] {:x (- (:x bounds) w) :y (- (:y bounds) w)})
-(defn ne-split [bounds w] {:x (+ (:x bounds) w) :y (- (:y bounds) w)})
-(defn se-split [bounds w] {:x (+ (:x bounds) w) :y (+ (:y bounds) w)})
-(defn sw-split [bounds w] {:x (- (:x bounds) w) :y (+ (:y bounds) w)})
+(defn nw-split
+  [bounds w h d]
+  (if (= d 0)
+    {:x (- (:x bounds) w) :y (- (:y bounds) h) :width 0 :height 0}
+    {:x (- (:x bounds) w) :y (- (:y bounds) h) :width w :height h}))
+(defn ne-split
+  [bounds w h d]
+  (if (= d 0)
+    {:x (+ (:x bounds) 0) :y (- (:y bounds) h) :width 0 :height 0}
+    {:x (+ (:x bounds) w) :y (- (:y bounds) h) :width w :height h}))
+(defn se-split
+  [bounds w h d]
+  (if (= d 0)
+    {:x (+ (:x bounds) 0) :y (+ (:y bounds) 0) :width 0 :height 0}
+    {:x (+ (:x bounds) w) :y (+ (:y bounds) h) :width w :height h}))
+(defn sw-split
+  [bounds w h d]
+  (if (= d 0)
+    {:x (- (:x bounds) w) :y (+ (:y bounds) 0) :width 0 :height 0}
+    {:x (- (:x bounds) w) :y (+ (:y bounds) h) :width w :height h}))
+
+(defn in-bounds?
+  "Check if a given cell is within a boundary."
+  [{:keys [x y width height]} cell]
+  (if (nil? x)
+    false
+    (and (>= (:x cell) (- x width))
+         (<= (:x cell) (+ x width))
+         (>= (:y cell) (- y height))
+         (<= (:y cell) (+ y height)))))
 
 (defn insert
-  ([tree cell] (insert tree (:bounds tree) cell))
-  ([tree root-bounds cell]
-   (let [bound-at-depth (bound-by-depth root-bounds (:depth tree))]
-     (cond
-       (and (= 1 (:depth tree)) (nw? bound-at-depth cell))
-       (assoc tree :nw (make-leaf true))
+  [tree cell]
+  (println (:depth tree) (:bounds tree))
+  (when (= (:depth tree) 0)
+    (println "NOW ITSSS ZERO")
+    (println "x "
+             (get-in tree [:bounds :x])
+             (get-in tree [:bounds :y])
+             )
+    )
+  (cond
+    (not (in-bounds? (:bounds tree) cell))
+    (do
+      (println "NOT IN BOUNDS " (:bounds tree))
+      tree)
 
-       (and (= 1 (:depth tree)) (ne? bound-at-depth cell))
-       (assoc tree :ne (make-leaf true))
+    (and (= (:depth tree) 0)
+         (= (get-in tree [:bounds :x]) (:x cell))
+         (= (get-in tree [:bounds :y]) (:y cell)))
+    (do
+      (println "CELL :: " cell (in-bounds? (:bounds tree) cell) " bb :: " (:bounds tree))
+      cell)
 
-       (and (= 1 (:depth tree)) (se? bound-at-depth cell))
-       (assoc tree :se (make-leaf true))
+    (= (:depth tree) 0)
+    tree
 
-       (and (= 1 (:depth tree)) (sw? bound-at-depth cell))
-       (assoc tree :sw (make-leaf true))
+    (nil? (:nw tree))
+    (let [next-depth (dec (:depth tree))
+          w (if (= 0 next-depth)
+              1
+              (/ (:width (:bounds tree)) 2))
+          b (if (= 0 next-depth)
+              (-> (assoc (:bounds tree) :width 0)
+                  (assoc :height 0))
+              (:bounds tree))
+          nw-b (nw-split b w w next-depth)
+          ne-b (ne-split b w w next-depth)
+          se-b (se-split b w w next-depth)
+          sw-b (sw-split b w w next-depth)
+          nw (node nw-b next-depth)
+          ne (node ne-b next-depth)
+          se (node se-b next-depth)
+          sw (node sw-b next-depth)
+          new-node (-> (assoc tree :nw nw)
+                       (assoc :ne ne)
+                       (assoc :se se)
+                       (assoc :sw sw))]
+      (insert new-node cell)
+      )
 
-       (> (:depth tree) 1)
-       (let [nw (insert (:nw tree) root-bounds cell)]
-         (if (= nw (:nw tree))
-           (let [ne (insert (:ne tree) root-bounds cell)]
-             (if (= ne (:ne tree))
-               (let [se (insert (:se tree) root-bounds cell)]
-                 (if (= se (:se tree))
-                   (assoc tree :sw (insert (:sw tree) root-bounds cell))
-                   (assoc tree :se se)))
-               (assoc tree :ne ne)))
-           (assoc tree :nw nw)))
+    (in-bounds? (get (:nw tree) :bounds) cell)
+    (do
+      (println "We just go in here and never come up... " (:depth tree) (:bounds tree))
+      (assoc tree :nw (insert (:nw tree) cell)))
 
-       :else
-       tree
-       ))))
+    (in-bounds? (get (:ne tree) :bounds) cell)
+    (assoc tree :ne (insert (:ne tree) cell))
+
+    (in-bounds? (get (:se tree) :bounds) cell)
+    (assoc tree :se (insert (:se tree) cell))
+
+    (in-bounds? (get (:sw tree) :bounds) cell)
+    (assoc tree :sw (insert (:sw tree) cell))
+
+    :else
+    (do
+      (println "Warning nothing..." tree)
+      tree)
+    )
+  )
 
 
 (def empty-node
@@ -105,14 +174,20 @@
 
   (let [tree (empty-tree {:depth  3
                           :bounds {:x 4 :y 4}})]
-    (-> (insert tree {:x 1 :y 0 :data {:alive? true}})
-        (insert {:x 0 :y 0 :data {:alive? true}})
-        (insert {:x 0 :y 1 :data {:alive? true}})
-        (insert {:x 1 :y 1 :data {:alive? true}})
+    (-> {:depth  3
+         :bounds {:x      4
+                  :y      4
+                  :width  4
+                  :height 4}}
+        ;(insert {:x 0 :y 0 :data {:i 0}})
+        ;(insert {:x 1 :y 0 :data {:i 1}})
+        (insert {:x 2 :y 0 :data {:i 2}})
         )
     )
 
   (bound-by-depth {:x 4 :y 4} 3)
+
+  (quot 8 8)
   )
 
 

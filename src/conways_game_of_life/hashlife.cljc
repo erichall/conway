@@ -13,6 +13,10 @@
   [nw ne se sw]
   (q/make-node (:se nw) (:sw ne) (:ne sw) (:nw se)))
 
+(defn centered-subnode
+  [nw ne se sw]
+  (q/make-node (:se nw) (:sw ne) (:ne sw) (:nw se)))
+
 (defn next-generation
   [tree]
   {:pre [(not (nil? tree))]}
@@ -21,39 +25,74 @@
     (= (:depth tree) 2) tree
     :else
     (let [{:keys [nw ne se sw]} tree
-          n00 (next-generation nw)
-          n01 (-> (horizontal-forward nw ne) next-generation)
-          n02 (next-generation ne)
+          n00 (centered-subnode (:nw nw) (:ne nw) (:se nw) (:sw nw))
+          n01 (-> (horizontal-forward nw ne)
+                  ;next-generation
+                  )
+          n02 (centered-subnode (:nw ne) (:ne ne) (:se ne) (:sw ne))
 
-          n10 (-> (vertical-forward nw se) next-generation)
-          n11 (-> (center-forward nw ne se sw) next-generation)
-          n12 (-> (vertical-forward ne se) next-generation)
+          n10 (-> (vertical-forward nw se)
+                  ;next-generation
+                  )
+          n11 (-> (center-forward nw ne se sw)
+                  ;next-generation
+                  )
+          n12 (-> (vertical-forward ne se)
+                  ;next-generation
+                  )
 
-          n20 (next-generation sw)
-          n21 (-> (horizontal-forward se sw) next-generation)
-          n22 (next-generation se)
+          n20 (centered-subnode (:nw sw) (:ne sw) (:se sw) (:sw sw))
+          n21 (-> (horizontal-forward se sw)
+                  ;next-generation
+                  )
+          n22 (centered-subnode (:nw se) (:ne se) (:se se) (:sw se))
 
-          t1 (-> (q/make-node n00 n01 n10 n11) next-generation)
-          t2 (-> (q/make-node n01 n02 n11 n12) next-generation)
-          t3 (-> (q/make-node n10 n11 n20 n21) next-generation)
-          t4 (-> (q/make-node n11 n12 n21 n22) next-generation)
+          t1 (-> (q/make-node n00 n01 n10 n11)
+                 ;next-generation
+                 )
+          t2 (-> (q/make-node n01 n02 n11 n12)
+                 ;next-generation
+                 )
+          t3 (-> (q/make-node n10 n11 n20 n21)
+                 ;next-generation
+                 )
+          t4 (-> (q/make-node n11 n12 n21 n22)
+                 ;next-generation
+                 )
 
           center-node (q/make-node t1 t2 t3 t4)
           ]
 
       center-node
       )))
+(defn cell-generator
+  [n]
+  (sort (fn [a b] (compare (get-in a [:data :i])
+                           (get-in b [:data :i])))
+        (-> (mapv (fn [i]
+                    (mapv (fn [j] {:x j :y i :data {:i      (+ j (* i n))
+                                                    :alive? true}}) (range n))
+                    ) (range n))
+            flatten))
+  )
 
 (comment
-  (let [tree (q/empty-tree {:depth  3
-                            :bounds {:x 4 :y 4}})]
-    (-> (q/insert tree {:x 1 :y 0 :data {:alive? true}})
-        (q/insert {:x 0 :y 0 :data {:alive? true}})
-        (q/insert {:x 0 :y 1 :data {:alive? true}})
-        (q/insert {:x 1 :y 1 :data {:alive? true}})
-        next-generation
-        )
+  (let [tree (reduce (fn [tree cell]
+                       (q/insert tree cell)
+                       ) {:depth  3
+                          :bounds {:x      4
+                                   :y      4
+                                   :width  4
+                                   :height 4}} (cell-generator 8))]
+    ;next-generation
+    ;tree
+
+    ;(q/insert e-tree {:x 4 :y 0})
+    ;(get-in tree [:nw :ne])
+    tree
     )
+
+  (cell-generator 8)
   )
 
 ;; S1
