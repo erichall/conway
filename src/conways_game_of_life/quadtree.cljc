@@ -15,9 +15,9 @@
    :population (if alive? 1 0)})
 
 (defn make-node
-  ([nw ne se sw] (make-node nw ne se sw (:depth nw)))
+  ([nw ne se sw] (make-node nw ne se sw (inc (or (:depth nw) 0))))
   ([nw ne se sw depth]
-   {:depth (inc (or depth 0))
+   {:depth depth
     :nw    nw
     :ne    ne
     :se    se
