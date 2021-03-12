@@ -9,8 +9,9 @@
   (bit-shift-left 1 n))
 
 (defn make-leaf
-  [alive?]
-  {:depth      0
+  [cell alive?]
+  {:cell       cell
+   :depth      0
    :alive?     alive?
    :population (if alive? 1 0)})
 
@@ -25,8 +26,9 @@
 
 (defn node
   [bounds depth]
-  {:bounds bounds
-   :depth  depth})
+  {:bounds     bounds
+   :population 0
+   :depth      depth})
 
 (defn bound-by-depth
   "Calculate the boundary from root node to a given depth"
@@ -72,6 +74,11 @@
          (>= (:y cell) (- y width))
          (<= (:y cell) (+ y width)))))
 
+(defn bounds=cell
+  [tree cell]
+  (and (= (get-in tree [:bounds :x]) (:x cell))
+       (= (get-in tree [:bounds :y]) (:y cell))))
+
 (defn insert
   [tree cell]
   (cond
@@ -79,24 +86,27 @@
     tree
 
     (= (:depth tree) 0)
-    (if (and (= (get-in tree [:bounds :x]) (:x cell))
-             (= (get-in tree [:bounds :y]) (:y cell)))
-      cell
+    (if (bounds=cell tree cell)
+      (make-leaf cell true)
       tree)
 
     (nil? (:nw tree))
     (let [next-depth (dec (:depth tree))
           w (/ (:width (:bounds tree)) 2)
-          b (:bounds tree)]
-      (-> (merge tree {:nw (-> (nw-split b w next-depth)
-                               (node next-depth))
-                       :ne (-> (ne-split b w next-depth)
-                               (node next-depth))
-                       :se (-> (se-split b w next-depth)
-                               (node next-depth))
-                       :sw (-> (sw-split b w next-depth)
-                               (node next-depth))})
-          (insert cell)))
+          b (:bounds tree)
+          n (make-node {:bounds (nw-split b w next-depth)
+                        :depth  next-depth}
+                       {:bounds (ne-split b w next-depth)
+                        :depth  next-depth}
+                       {:bounds (se-split b w next-depth)
+                        :depth  next-depth}
+                       {:bounds (sw-split b w next-depth)
+                        :depth  next-depth}
+                       (:depth tree))
+          t (-> (merge tree n)
+                (insert cell))]
+      t
+      )
 
     :else
     (merge tree {:nw (insert (:nw tree) cell)
@@ -107,10 +117,10 @@
 
 
 (def empty-node
-  {:nw (make-leaf false)
-   :ne (make-leaf false)
-   :se (make-leaf false)
-   :sw (make-leaf false)})
+  {:nw (make-leaf nil false)
+   :ne (make-leaf nil false)
+   :se (make-leaf nil false)
+   :sw (make-leaf nil false)})
 
 (defn empty-tree
   "Creates a empty tree of depth n that fits a square board of 2^tree-depth x 2^tree-depth cells."
