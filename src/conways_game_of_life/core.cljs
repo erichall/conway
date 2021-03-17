@@ -275,12 +275,12 @@
   (if (grid [x y]) "black" "white"))
 
 (defonce app-state-atom (atom nil))
-(def grid-size 1000)
+(def grid-size 100)                                         ;; px
 (def initial-state
   {:states [{:cell-size     10                              ;; px
              :grid-size     grid-size
-             :grid          (:heavy shapes)
-             ;:grid          (:blinker shapes)
+             ;:grid          (:heavy shapes)
+             :grid          (:blinker shapes)
              :canvas-id     "conway-canvas"
              :seed          1
              :initial-seed? false
@@ -376,7 +376,12 @@
 (defn inc-grid
   [{:keys [grid grid-size toroidal?] :as state}]
   (let [size (/ grid-size 2)
-        neighbours (fn [cell] (neighbours size toroidal? cell))]
+        neighbours (fn [cell]
+                     (let [n (neighbours size toroidal? cell)]
+                       (println "CELL " cell "nn: " n)
+                       n
+                       )
+                     )]
     (-> (for [[cell n-neighbours] (->> grid
                                        (mapcat neighbours)
                                        frequencies)
@@ -387,6 +392,7 @@
 
 (defn tick
   [{:keys [seed] :as state}]
+  (println "tiiick")
   (let [state (->> (inc-grid state)
                    (assoc state :grid))]
     (assoc state :seed (next-seed seed 1))))
@@ -415,6 +421,7 @@
 
 (defn handle-event!
   ([name data]
+   (println "DUDE" name)
    (condp = name
      :tick (mutate! app-state-atom (fn [state]
                                      (let [prev-grid (:grid state)
@@ -442,7 +449,7 @@
                                             cell (c/xy->cell (merge (c/relative-cord (:canvas context) data)
                                                                     {:cell-size (:cell-size (get-state app-state-atom))}))
                                             state (update-in state [:grid] (if (grid cell) disj conj) cell)]
-                                        (c/draw-cell! {:ctx        ((:get-ctx context))
+                                        (c/draw-cell! {:ctx        (:ctx context)
                                                        :cell       (mapv #(* cell-size %) cell)
                                                        :size       cell-size
                                                        :fill-color (cell-color state cell)})

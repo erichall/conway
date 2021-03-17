@@ -26,7 +26,7 @@
         (recur)))))
 
 (def canvas (.getElementById js/document "conway-canvas"))
-(defn- initial-state
+(def initial-state
   {:canvas canvas
    :width  (.-width canvas)
    :height (.-height canvas)
@@ -58,7 +58,7 @@
 
 (defn draw-cells!
   [{:keys [size cell-color-fn context] :as args}]
-  (let [ctx ((:get-ctx context))]
+  (let [ctx (:ctx context)]
 
     ;(.beginPath ctx)
     (js/console.log (:image-data context))
@@ -111,7 +111,8 @@
   (let [height (+ 1 height)
         width (+ 1 width)
         canvas (:canvas context)
-        ctx ((:get-ctx context))]
+        _ (println context)
+        ctx (:ctx context)]
 
     (set! (.-height canvas) height)
     (set! (.-width canvas) width)
@@ -131,13 +132,13 @@
         (for [y (range height)
               x (range width)]
 
-          (draw-cell! {:ctx        ((:get-ctx context))
+          (draw-cell! {:ctx        ctx
                        :cell       [(* cell-size x) (* cell-size y)]
                        :batch      true
                        :size       cell-size
                        :fill-color (cell-color-fn [x y])}))))
 
-    (draw-grid-lines! {:ctx       ((:get-ctx context))
+    (draw-grid-lines! {:ctx       ctx
                        :width     width
                        :height    height
                        :cell-size cell-size})

@@ -87,7 +87,7 @@
 
     (= (:depth tree) 0)
     (if (bounds=cell tree cell)
-      (make-leaf cell true)
+      cell
       tree)
 
     (nil? (:nw tree))

@@ -12,6 +12,105 @@
         :when (not (= [0 0] [dx dy]))]
     [(+ dx x) (+ dy y)]))
 
+(neighbours {:x 0 :y 0})
+(def t {:bounds {:x 2, :y 2, :width 2}, :depth 2, :nw {:bounds {:x 1, :y 1, :width 1}, :depth 1, :nw {:x 0, :y 0, :data {:i 0, :alive? true}}, :ne {:x 1, :y 0, :data {:i 1, :alive? true}}, :se {:x 1, :y 1, :data {:i 9, :alive? true}}, :sw {:x 0, :y 1, :data {:i 8, :alive? true}}}, :ne {:bounds {:x 3, :y 1, :width 1}, :depth 1, :nw {:x 2, :y 0, :data {:i 2, :alive? true}}, :ne {:x 3, :y 0, :data {:i 3, :alive? true}}, :se {:x 3, :y 1, :data {:i 11, :alive? true}}, :sw {:x 2, :y 1, :data {:i 10, :alive? true}}}, :se {:bounds {:x 3, :y 3, :width 1}, :depth 1, :nw {:x 2, :y 2, :data {:i 18, :alive? true}}, :ne {:x 3, :y 2, :data {:i 19, :alive? true}}, :se {:x 3, :y 3, :data {:i 27, :alive? true}}, :sw {:x 2, :y 3, :data {:i 26, :alive? true}}}, :sw {:bounds {:x 1, :y 3, :width 1}, :depth 1, :nw {:x 0, :y 2, :data {:i 16, :alive? true}}, :ne {:x 1, :y 2, :data {:i 17, :alive? true}}, :se {:x 1, :y 3, :data {:i 25, :alive? true}}, :sw {:x 0, :y 3, :data {:i 24, :alive? true}}}})
+(def dead 0)
+
+(defn alive
+  [cell]
+  (- cell dead))
+
+(defn life
+  [nw nn ne
+   ww cc ee
+   sw ss se]
+  (let [count (+ (alive nw) (alive nn) (alive ne)
+                 (alive ww) 0 (alive ee)
+                 (alive sw) (alive ss) (alive se))]
+    (if (= count 2)
+      (= cc 1)
+      (= count 3))))
+
+(defn depth-two->matrix
+  "Casts a depth 2 tree into a 2d matrix"
+  [{:keys [nw ne se sw]}]
+  [[(:nw nw) (:ne nw) (:nw ne) (:ne ne)]
+   [(:sw nw) (:se nw) (:sw ne) (:se ne)]
+   [(:nw sw) (:ne sw) (:nw se) (:ne se)]
+   [(:sw sw) (:se sw) (:sw se) (:se se)]])
+
+(defn depth-two->list
+  [{:keys [nw ne se sw]}]
+  [(:nw nw) (:ne nw) (:nw ne) (:ne ne)
+   (:sw nw) (:se nw) (:sw ne) (:se ne)
+   (:nw sw) (:ne sw) (:nw se) (:ne se)
+   (:sw sw) (:se sw) (:sw se) (:se se)])
+
+(comment
+  (frequencies (mapcat neighbours (depth-two->list t)))
+
+  (depth-two->list t)
+
+  (map (fn [row]
+         (map (fn [cell]
+
+                ) row)
+         ) t)
+  )
+
+(defn to-1d
+  [{:keys [x y]}]
+  (+ (* 3 (Math/abs x)) (Math/abs y)))
+
+(defn get-cell
+  [c x y]
+  (if (get-in c [(Math/min (Math/max y 0) 8) (Math/min (Math/max x 0) 8) :data :alive?])
+    1
+    0))
+
+(defn list->center
+  "From a list with cells of depth two, return the center cells"
+  [l]
+  [(nth l 5) (nth l 6)
+   (nth l 9) (nth l 10)])
+
+(defn get-center
+  [{:keys [nw ne se sw]}]
+  (q/make-node (:se nw) (:sw ne) (:nw se) (:ne sw)))
+
+(defn base-case
+  [tree survive? birth?]
+  (let [cells (depth-two->list tree)
+        c (depth-two->matrix tree)
+        a (map-indexed (fn [i cell]
+                         (let [x (int (/ i 3))
+                               y (mod i 3)]
+                           (life (get-cell c (- x 1) (- y 1)) (get-cell c x (- y 1)) (get-cell c (+ x 1) (+ y 1))
+                                 (get-cell c (- x 1) y) (get-cell c x y) (get-cell c (+ x 1) y)
+                                 (get-cell c (- x 1) (+ y 1)) (get-cell c x (+ y 1)) (get-cell c (+ x 1) (+ y 1))
+                                 ))
+                         )
+                       cells)
+        centers (get-center tree)
+        alive-centers (list->center a)
+        ]
+    (println alive-centers)
+    (/ 1 0)
+    (-> centers
+        (assoc-in [:nw :data :alive?] (nth alive-centers 0))
+        (assoc-in [:ne :data :alive?] (nth alive-centers 1))
+        (assoc-in [:se :data :alive?] (nth alive-centers 3))
+        (assoc-in [:sw :data :alive?] (nth alive-centers 2))
+        )
+    ))
+
+
+
+(comment
+  (list->center (depth-two->list t))
+
+  )
+
 (defn node->list
   [tree]
   [(:nw tree) (:ne tree) (:se tree) (:sw tree)])
@@ -55,9 +154,17 @@
   [n s]
   (q/make-node (get-in n [:sw :se]) (get-in n [:se :sw]) (get-in s [:nw :ne]) (get-in s [:ne :nw])))
 
-(defn get-center
-  [{:keys [nw ne se sw]}]
-  (q/make-node (:se nw) (:sw ne) (:nw se) (:ne sw)))
+
+(defn find-nw [tree] (:nw tree))
+
+(defn find-nn [tree] (q/make-node (get-in tree [:nw :ne]) (get-in tree [:ne :nw]) (get-in tree [:ne :sw]) (get-in tree [:nw :se]) (- (:depth tree) 1)))
+(defn find-ne [tree] (:ne tree))
+(defn find-ww [tree] (q/make-node (get-in tree [:nw :sw]) (get-in tree [:nw :se]) (get-in tree [:sw :ne]) (get-in tree [:sw :nw]) (- (:depth tree) 1)))
+(defn find-cc [tree] (q/make-node (get-in tree [:nw :se]) (get-in tree [:ne :sw]) (get-in tree [:se :nw]) (get-in tree [:sw :ne]) (- (:depth tree) 1)))
+(defn find-ee [tree] (q/make-node (get-in tree [:ne :sw]) (get-in tree [:ne :se]) (get-in tree [:se :ne]) (get-in tree [:se :nw]) (- (:depth tree) 1)))
+(defn find-sw [tree] (:sw tree))
+(defn find-ss [tree] (q/make-node (get-in tree [:sw :ne]) (get-in tree [:se :nw]) (get-in tree [:se :sw]) (get-in tree [:sw :se]) (- (:depth tree) 1)))
+(defn find-se [tree] (:se tree))
 
 (defn next-generation
   [tree]
@@ -96,7 +203,7 @@
   [tree]
   {:pre [(not (nil? tree))]}
   (cond
-    (= (:depth tree) 2) tree
+    (= (:depth tree) 2) (get-center tree)
     :else
     (let [{:keys [nw ne se sw depth]} tree
           n11 (q/make-node (get-in tree [:sw :sw]) (get-in tree [:sw :se]) (get-in tree [:sw :nw]) (get-in tree [:sw :ne]))
@@ -148,7 +255,7 @@
   [tree]
   {:pre [(not (nil? tree))]}
   (cond
-    (= (:depth tree) 2) tree
+    (= (:depth tree) 2) (get-center tree)
     :else
     (let [{:keys [nw ne se sw depth]} tree
           n00 (next-generation-v3 nw)
@@ -212,6 +319,78 @@
         )
       )))
 
+(defn next-generation-v5
+  "This is gosper final iteration."
+  [tree]
+  {:pre [(not (nil? tree))]}
+  (cond
+    (= (:depth tree) 2) tree
+    :else
+    (let [{:keys [nw ne se sw depth]} tree
+          n00 (next-generation-v5 nw)
+          n01 (horizontal-forward nw ne)
+          n02 (next-generation-v5 ne)
+
+          n10 (vertical-forward nw sw)
+          n11 (center-forward nw ne se sw)
+          n12 (vertical-forward ne se)
+
+          n20 (next-generation-v5 sw)
+          n21 (horizontal-forward sw se)
+          n22 (next-generation-v5 se)
+
+          t1 (-> (q/make-node n00 n01 n10 n11) next-generation-v5)
+          t2 (-> (q/make-node n01 n02 n11 n12) next-generation-v5)
+          t3 (-> (q/make-node n10 n11 n20 n21) next-generation-v5)
+          t4 (-> (q/make-node n11 n12 n21 n22) next-generation-v5)
+          ]
+
+      (q/make-node t1 t2 t3 t4)
+      )))
+
+(defonce db-v6 (atom {}))
+(defn next-generation-v6
+  [tree]
+  {:pre [(not (nil? tree))]}
+  (cond
+    ;; cache
+    (get @db-v6 tree) (get @db-v6 tree)
+
+    (= (:depth tree) 2) (base-case tree nil nil)
+    :else
+    (let [
+          sub-depth (- (:depth tree) 1)
+          ;; first find all n-1 sub-squares then calculate the n-2 results
+          nw (-> (find-nw tree) next-generation-v6)
+          nn (-> (find-nn tree) next-generation-v6)
+          ne (-> (find-ne tree) next-generation-v6)
+
+          ww (-> (find-ww tree) next-generation-v6)
+          cc (-> (find-cc tree) next-generation-v6)
+          ee (-> (find-ee tree) next-generation-v6)
+
+          sw (-> (find-sw tree) next-generation-v6)
+          ss (-> (find-ss tree) next-generation-v6)
+          se (-> (find-se tree) next-generation-v6)
+
+          ;; now, construct the overlapping n-1 squares and calculate theirs n-2 results
+          nw (-> (q/make-node nw nn cc ww sub-depth) next-generation-v6)
+          ne (-> (q/make-node nn ne ee cc sub-depth) next-generation-v6)
+          sw (-> (q/make-node ww cc ss sw sub-depth) next-generation-v6)
+          se (-> (q/make-node cc ee se ss sub-depth) next-generation-v6)
+          calc (q/make-node nw ne se sw)
+          ]
+
+      (swap! db-v6 assoc (hash tree) calc)
+
+      calc
+
+      )))
+
+(def memo-next-generation-v6 (memoize next-generation-v6))
+
+
+
 
 
 (defn cell-generator
@@ -219,41 +398,43 @@
   (sort (fn [a b] (compare (get-in a [:data :i])
                            (get-in b [:data :i])))
         (-> (mapv (fn [i]
-                    (mapv (fn [j] {:x j :y i :data {:i      (+ j (* i n))
-                                                    :alive? true}}) (range n))
+                    (mapv (fn [j]
+                            (let [i (+ j (* i n))]
+                              (println "II" i)
+                              {:x j :y i :data {:i      i
+                                                :alive? true}})) (range n))
                     ) (range n))
             flatten))
   )
 
-(comment
-  ;; 8x8    --> depth = 3
-  ;; 16x16  --> depth = 4
-  ;; 32x32  --> depth = 5
-  (let [depth 4
-        c 8
-        cells 16
-        tree (reduce (fn [tree cell]
-                       (q/insert tree cell)
-                       ) {:depth  depth
-                          :bounds {:x      c
-                                   :y      c
-                                   :width  c
-                                   :height c}} (cell-generator cells))]
-    ;(tree->cells tree)
+  (comment
+    ;; 8x8    --> depth = 3
+    ;; 16x16  --> depth = 4
+    ;; 32x32  --> depth = 5
+    (let [depth 3
+          c 4
+          cells 8
+          tree (reduce (fn [tree cell]
+                         (q/insert tree cell)
+                         ) {:depth  depth
+                            :bounds {:x      c
+                                     :y      c
+                                     :width  c
+                                     :height c}} (cell-generator cells))]
+      ;(tree->cells tree)
 
-    ;(centered-horizontal (:nw tree) (:ne tree))
-    (-> tree
-        ;next-generation
-        next-generation-v4
-        ;tree->cells
-        ;count
-        )
+      (reset! db-v6 {})
+      ;(centered-horizontal (:nw tree) (:ne tree))
+      (-> tree
+          ;next-generation
+          ;next-generation-v6
+          ;tree->cells
+          ;count
+          )
+
+      )
+
+    (println (count (keys @db-v6)))
 
     )
-
-  )
-
-
-
-
 
