@@ -63,6 +63,10 @@
   (if (= d 0)
     {:x (- (:x bounds) 1) :y (:y bounds)}
     {:x (- (:x bounds) w) :y (+ (:y bounds) w) :width w}))
+(def memo-nw-split (memoize nw-split))
+(def memo-ne-split (memoize ne-split))
+(def memo-se-split (memoize se-split))
+(def memo-sw-split (memoize sw-split))
 
 (defn in-bounds?
   "Check if a given cell is within a boundary."
@@ -74,10 +78,15 @@
          (>= (:y cell) (- y width))
          (<= (:y cell) (+ y width)))))
 
-(defn bounds=cell
+(defn tree=cell
   [tree cell]
   (and (= (get-in tree [:bounds :x]) (:x cell))
        (= (get-in tree [:bounds :y]) (:y cell))))
+
+(defn bounds=cell
+  [bounds cell]
+  (and (= (:x bounds) (:x cell))
+       (= (:y bounds) (:y cell))))
 
 (defn insert
   [tree cell]
@@ -85,27 +94,36 @@
     (not (in-bounds? (:bounds tree) cell))
     tree
 
+    (= (:depth tree) 1)
+    (let [w (/ (:width (:bounds tree)) 2)
+          b (:bounds tree)]
+      (cond
+        (bounds=cell (memo-nw-split b w 0) cell) (assoc tree :nw cell)
+        (bounds=cell (memo-ne-split b w 0) cell) (assoc tree :ne cell)
+        (bounds=cell (memo-se-split b w 0) cell) (assoc tree :se cell)
+        (bounds=cell (memo-sw-split b w 0) cell) (assoc tree :sw cell)
+        :else tree))
+
     (= (:depth tree) 0)
-    (if (bounds=cell tree cell)
+    (if (tree=cell tree cell)
       cell
-      tree)
+      nil)
 
     (nil? (:nw tree))
     (let [next-depth (dec (:depth tree))
           w (/ (:width (:bounds tree)) 2)
           b (:bounds tree)
-          n (make-node {:bounds (nw-split b w next-depth)
-                        :depth  next-depth}
-                       {:bounds (ne-split b w next-depth)
-                        :depth  next-depth}
-                       {:bounds (se-split b w next-depth)
-                        :depth  next-depth}
-                       {:bounds (sw-split b w next-depth)
-                        :depth  next-depth}
-                       (:depth tree))
-          t (-> (merge tree n)
-                (insert cell))]
-      t
+          n (insert (merge tree (make-node {:bounds (memo-nw-split b w next-depth)
+                                            :depth  next-depth}
+                                           {:bounds (memo-ne-split b w next-depth)
+                                            :depth  next-depth}
+                                           {:bounds (memo-se-split b w next-depth)
+                                            :depth  next-depth}
+                                           {:bounds (memo-sw-split b w next-depth)
+                                            :depth  next-depth}
+                                           (:depth tree))) cell)
+          ]
+      n
       )
 
     :else

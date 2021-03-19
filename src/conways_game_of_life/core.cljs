@@ -378,10 +378,7 @@
   (let [size (/ grid-size 2)
         neighbours (fn [cell]
                      (let [n (neighbours size toroidal? cell)]
-                       (println "CELL " cell "nn: " n)
-                       n
-                       )
-                     )]
+                       n))]
     (-> (for [[cell n-neighbours] (->> grid
                                        (mapcat neighbours)
                                        frequencies)

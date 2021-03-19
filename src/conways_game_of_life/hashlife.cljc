@@ -80,35 +80,8 @@
 
 (defn base-case
   [tree survive? birth?]
-  (let [cells (depth-two->list tree)
-        c (depth-two->matrix tree)
-        a (map-indexed (fn [i cell]
-                         (let [x (int (/ i 3))
-                               y (mod i 3)]
-                           (life (get-cell c (- x 1) (- y 1)) (get-cell c x (- y 1)) (get-cell c (+ x 1) (+ y 1))
-                                 (get-cell c (- x 1) y) (get-cell c x y) (get-cell c (+ x 1) y)
-                                 (get-cell c (- x 1) (+ y 1)) (get-cell c x (+ y 1)) (get-cell c (+ x 1) (+ y 1))
-                                 ))
-                         )
-                       cells)
-        centers (get-center tree)
-        alive-centers (list->center a)
-        ]
-    (println alive-centers)
-    (/ 1 0)
-    (-> centers
-        (assoc-in [:nw :data :alive?] (nth alive-centers 0))
-        (assoc-in [:ne :data :alive?] (nth alive-centers 1))
-        (assoc-in [:se :data :alive?] (nth alive-centers 3))
-        (assoc-in [:sw :data :alive?] (nth alive-centers 2))
-        )
-    ))
-
-
-
-(comment
-  (list->center (depth-two->list t))
-
+  (println (tree->cells tree))
+  (get-center tree)
   )
 
 (defn node->list
@@ -120,9 +93,7 @@
   (loop [[node & nodes] (node->list tree)
          cells #{}]
     (cond
-      (not (nil? (get-in node [:cell :x]))) (recur nodes (conj cells [(get-in node [:cell :x])
-                                                                      (get-in node [:cell :y])
-                                                                      (get-in node [:cell :data :i])]))
+      (= (:depth node) 1) (recur nodes (filter some? (conj cells (:nw node) (:ne node) (:se node) (:sw node))))
       node (recur (concat nodes (node->list node)) cells)
       :else cells)))
 
@@ -399,42 +370,71 @@
                            (get-in b [:data :i])))
         (-> (mapv (fn [i]
                     (mapv (fn [j]
-                            (let [i (+ j (* i n))]
-                              (println "II" i)
-                              {:x j :y i :data {:i      i
-                                                :alive? true}})) (range n))
+                            (let [ii (+ j (* i n))]
+                              {:x j :y i :data {:i      ii
+                                                :alive? (or (= ii 18)
+                                                            (= ii 20)
+                                                            (= ii 27)
+                                                            (= ii 28)
+                                                            (= ii 35)
+                                                            )}})) (range n))
                     ) (range n))
             flatten))
   )
 
-  (comment
-    ;; 8x8    --> depth = 3
-    ;; 16x16  --> depth = 4
-    ;; 32x32  --> depth = 5
-    (let [depth 3
-          c 4
-          cells 8
-          tree (reduce (fn [tree cell]
-                         (q/insert tree cell)
-                         ) {:depth  depth
-                            :bounds {:x      c
-                                     :y      c
-                                     :width  c
-                                     :height c}} (cell-generator cells))]
-      ;(tree->cells tree)
+(defn ->1d
+  [x y w]
+  (+ x (* y w)))
 
-      (reset! db-v6 {})
-      ;(centered-horizontal (:nw tree) (:ne tree))
-      (-> tree
-          ;next-generation
-          ;next-generation-v6
-          ;tree->cells
-          ;count
-          )
+(def glider
+  #{{:x 2 :y 2 :data {:i (->1d 2 2 8)}}
+    {:x 4 :y 2 :data {:i (->1d 4 2 8)}}
+    {:x 3 :y 3 :data {:i (->1d 3 3 8)}}
+    {:x 4 :y 3 :data {:i (->1d 4 3 8)}}
+    {:x 3 :y 4 :data {:i (->1d 3 4 8)}}})
 
-      )
+(comment
+  ;; 8x8    --> depth = 3
+  ;; 16x16  --> depth = 4
+  ;; 32x32  --> depth = 5
+  (let [depth 3
+        c 4
+        cells 8
+        tree (reduce (fn [tree cell]
+                       (q/insert tree cell)
+                       ) {:depth  depth
+                          :bounds {:x      c
+                                   :y      c
+                                   :width  c
+                                   :height c}}
+                     ;[
+                     ;{:x 0 :y 0 :data {:i (->1d 0 0 8)}}
+                     ;{:x 1 :y 0 :data {:i (->1d 1 0 8)}}
+                     ;{:x 1 :y 1 :data {:i (->1d 2 0 8)}}
+                     ;{:x 0 :y 1 :data {:i (->1d 0 1 8)}}
+                     ;;;
+                     ;{:x 2 :y 0 :data {:i (->1d 2 0 8)}}
+                     ;{:x 3 :y 0 :data {:i (->1d 3 0 8)}}
+                     ;{:x 3 :y 1 :data {:i (->1d 3 1 8)}}
+                     ;{:x 2 :y 1 :data {:i (->1d 2 1 8)}}
+                     ;]
+                     ;(cell-generator cells)
+                     glider
+                     )]
+    ;(tree->cells tree)
 
-    (println (count (keys @db-v6)))
+    (reset! db-v6 {})
+    ;(centered-horizontal (:nw tree) (:ne tree))
+    (-> tree
+        ;next-generation
+        next-generation-v6
+        ;tree->cells
+        ;count
+        )
 
     )
+
+  (println (count (keys @db-v6)))
+
+  )
 
