@@ -1,6 +1,7 @@
 (ns conways-game-of-life.quadtree
-  (:require [clojure.pprint :refer [pprint]
-             ]))
+  (:require [clojure.pprint :refer [pprint]]
+            [clojure.test :refer [is deftest]]
+            ))
 
 (defn not-nil? [x] (not (nil? x)))
 (defn two-pow
@@ -43,6 +44,7 @@
 (defn se? [^long b cell] (and (= b (:x cell)) (= b (:y cell))))
 (defn sw? [^long b cell] (and (= (- b 1) (:x cell)) (= b (:y cell))))
 
+
 (defn nw-split
   [bounds w d]
   (if (= d 0)
@@ -70,13 +72,103 @@
 
 (defn in-bounds?
   "Check if a given cell is within a boundary."
+  {:test (fn []
+           ;; nw bounds {:x 2, :y 2, :w 2} in 8x8, x,y = 0,0. 3,0. 3,0. 3,3
+           (let [b {:x 2 :y 2 :width 2}]
+             (is (= (in-bounds? b {:x 0 :y 0}) true))
+             (is (= (in-bounds? b {:x 3 :y 0}) true))
+             (is (= (in-bounds? b {:x 0 :y 3}) true))
+             (is (= (in-bounds? b {:x 3 :y 3}) true))
+             (is (= (in-bounds? b {:x 4 :y 0}) false))
+             (is (= (in-bounds? b {:x 4 :y 4}) false))
+             (is (= (in-bounds? b {:x 0 :y 4}) false)))
+
+           ;; ne bounds {:x 6, :y 2, :w 2} x,y = 3,0. 7,0. 7,3. 3,3
+           (let [b {:x 6 :y 2 :width 2}]
+             (is (= (in-bounds? b {:x 4 :y 0}) true))
+             (is (= (in-bounds? b {:x 7 :y 0}) true))
+             (is (= (in-bounds? b {:x 7 :y 3}) true))
+             (is (= (in-bounds? b {:x 4 :y 3}) true))
+             (is (= (in-bounds? b {:x 3 :y 3}) false))
+             (is (= (in-bounds? b {:x 3 :y 0}) false))
+             (is (= (in-bounds? b {:x 8 :y 0}) false))
+             (is (= (in-bounds? b {:x 4 :y 4}) false)))
+
+           ;; se bounds {:x 6 :y 6, w: 2} x,y = 4,4. 7,4, 7,7. 4,7
+           (let [b {:x 6 :y 6 :width 2}]
+             (is (= (in-bounds? b {:x 4 :y 4}) true))
+             (is (= (in-bounds? b {:x 7 :y 4}) true))
+             (is (= (in-bounds? b {:x 7 :y 7}) true))
+             (is (= (in-bounds? b {:x 4 :y 7}) true))
+             (is (= (in-bounds? b {:x 3 :y 4}) false))
+             (is (= (in-bounds? b {:x 4 :y 3}) false))
+             (is (= (in-bounds? b {:x 8 :y 8}) false))
+             (is (= (in-bounds? b {:x 3 :y 7}) false)))
+           ;; sw bounds {:x 2 :y 6, :w 2} x,y = 0,4. 3,4. 3,7. 0.7
+           (let [b {:x 2 :y 6 :width 2}]
+             (is (= (in-bounds? b {:x 0 :y 4}) true))
+             (is (= (in-bounds? b {:x 3 :y 4}) true))
+             (is (= (in-bounds? b {:x 3 :y 7}) true))
+             (is (= (in-bounds? b {:x 0 :y 7}) true))
+             (is (= (in-bounds? b {:x 3 :y 3}) false))
+             (is (= (in-bounds? b {:x 4 :y 4}) false))
+             (is (= (in-bounds? b {:x 0 :y 3}) false))
+             (is (= (in-bounds? b {:x 4 :y 7}) false)))
+
+           ;; a nw super square as in hashlife
+           ;; bounds {:x 3, :y 3, :w 2}, x,y = 1,1 4,1 4,4, 1,4
+           (let [b {:x 3 :y 3 :width 2}]
+             (is (= (in-bounds? b {:x 1 :y 1}) true))
+             (is (= (in-bounds? b {:x 4 :y 1}) true))
+             (is (= (in-bounds? b {:x 4 :y 4}) true))
+             (is (= (in-bounds? b {:x 1 :y 4}) true))
+             (is (= (in-bounds? b {:x 0 :y 0}) false))
+             (is (= (in-bounds? b {:x 1 :y 0}) false))
+             (is (= (in-bounds? b {:x 1 :y 5}) false))
+             (is (= (in-bounds? b {:x 5 :y 4}) false)))
+
+           ;; a ne super square as in hashlife for 8x8
+           ;; bounds {:x 5 :y 3 :w 2} x,y = 3,1 6,1 6,4 3,4
+           (let [b {:x 5 :y 3 :width 2}]
+             (is (= (in-bounds? b {:x 3 :y 1}) true))
+             (is (= (in-bounds? b {:x 6 :y 1}) true))
+             (is (= (in-bounds? b {:x 6 :y 4}) true))
+             (is (= (in-bounds? b {:x 3 :y 4}) true))
+             (is (= (in-bounds? b {:x 2 :y 1}) false))
+             (is (= (in-bounds? b {:x 3 :y 5}) false))
+             (is (= (in-bounds? b {:x 7 :y 1}) false))
+             (is (= (in-bounds? b {:x 6 :y 5}) false)))
+
+           ;; a se super square as in hashlife for 8x8
+           ;; bounds {:x 5 :y 5, w: 2} x,y = 3,3 3,6 6,3 6,6
+           (let [b {:x 5 :y 5 :width 2}]
+             (is (= (in-bounds? b {:x 3 :y 3}) true))
+             (is (= (in-bounds? b {:x 3 :y 6}) true))
+             (is (= (in-bounds? b {:x 6 :y 3}) true))
+             (is (= (in-bounds? b {:x 6 :y 6}) true))
+             (is (= (in-bounds? b {:x 3 :y 2}) false))
+             (is (= (in-bounds? b {:x 7 :y 3}) false))
+             (is (= (in-bounds? b {:x 6 :y 7}) false))
+             (is (= (in-bounds? b {:x 2 :y 6}) false)))
+
+           ;; a sw super squuare as in hashlife for 8x8
+           ;; bounds {:x 3 :y 5 :w 2} x,y = 1,3 4,3 4,6 1,6
+           (let [b {:x 3 :y 5 :width 2}]
+             (is (= (in-bounds? b {:x 1 :y 3}) true))
+             (is (= (in-bounds? b {:x 4 :y 3}) true))
+             (is (= (in-bounds? b {:x 4 :y 6}) true))
+             (is (= (in-bounds? b {:x 1 :y 6}) true))
+             (is (= (in-bounds? b {:x 3 :y 2}) false))
+             (is (= (in-bounds? b {:x 7 :y 3}) false))
+             (is (= (in-bounds? b {:x 6 :y 7}) false))
+             (is (= (in-bounds? b {:x 1 :y 2}) false))))}
   [{:keys [x y width] :or {width 0}} cell]
   (if (nil? x)
     false
     (and (>= (:x cell) (- x width))
-         (<= (:x cell) (+ x width))
+         (< (:x cell) (+ x width))
          (>= (:y cell) (- y width))
-         (<= (:y cell) (+ y width)))))
+         (< (:y cell) (+ y width)))))
 
 (defn tree=cell
   [tree cell]
@@ -88,7 +180,7 @@
   (and (= (:x bounds) (:x cell))
        (= (:y bounds) (:y cell))))
 
-(defn insert
+(defn insert-struggle
   [tree cell]
   (cond
     (not (in-bounds? (:bounds tree) cell))
@@ -113,17 +205,52 @@
     (let [next-depth (dec (:depth tree))
           w (/ (:width (:bounds tree)) 2)
           b (:bounds tree)
-          n (insert (merge tree (make-node {:bounds (memo-nw-split b w next-depth)
-                                            :depth  next-depth}
-                                           {:bounds (memo-ne-split b w next-depth)
-                                            :depth  next-depth}
-                                           {:bounds (memo-se-split b w next-depth)
-                                            :depth  next-depth}
-                                           {:bounds (memo-sw-split b w next-depth)
-                                            :depth  next-depth}
-                                           (:depth tree))) cell)
+          n (insert-struggle (merge tree (make-node {:bounds (memo-nw-split b w next-depth)
+                                                     :depth  next-depth}
+                                                    {:bounds (memo-ne-split b w next-depth)
+                                                     :depth  next-depth}
+                                                    {:bounds (memo-se-split b w next-depth)
+                                                     :depth  next-depth}
+                                                    {:bounds (memo-sw-split b w next-depth)
+                                                     :depth  next-depth}
+                                                    (:depth tree))) cell)
           ]
-      n
+      n)
+
+    :else
+    (merge tree {:nw (insert-struggle (:nw tree) cell)
+                 :ne (insert-struggle (:ne tree) cell)
+                 :se (insert-struggle (:se tree) cell)
+                 :sw (insert-struggle (:sw tree) cell)})))
+
+(defn insert
+  [tree cell]
+  (cond
+    (= (:depth tree) 0)
+    (if (and (= (get-in tree [:bounds :x]) (:x cell))
+             (= (get-in tree [:bounds :y]) (:y cell)))
+      cell
+      tree)
+
+    (not (in-bounds? (:bounds tree) cell))
+    tree
+
+    (nil? (:nw tree))
+    (let [next-depth (dec (:depth tree))
+          w (/ (:width (:bounds tree)) 2)
+          b (:bounds tree)]
+      (merge tree {:nw (-> (nw-split b w next-depth)
+                           (node next-depth)
+                           (insert cell))
+                   :ne (-> (ne-split b w next-depth)
+                           (node next-depth)
+                           (insert cell))
+                   :se (-> (se-split b w next-depth)
+                           (node next-depth)
+                           (insert cell))
+                   :sw (-> (sw-split b w next-depth)
+                           (node next-depth)
+                           (insert cell))})
       )
 
     :else
@@ -132,6 +259,13 @@
                  :se (insert (:se tree) cell)
                  :sw (insert (:sw tree) cell)})
     ))
+
+(defn insert-cells
+  [tree cells]
+  (reduce (fn [tree cell]
+            ;(println "INSERTING CELL " cell "INTO")
+            ;(pprint tree)
+            (insert tree cell)) tree cells))
 
 
 (def empty-node
