@@ -25,7 +25,7 @@
         (handler name data)
         (recur)))))
 
-(def canvas (.getElementById js/document "conway-canvas"))
+;(def canvas (.getElementById js/document "conway-canvas"))
 (def initial-state
   {:canvas canvas
    :width  (.-width canvas)

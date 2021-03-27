@@ -10,7 +10,7 @@
   (for [dx dx
         dy dy
         :when (not (= [0 0] [dx dy]))]
-    [(+ dx x) (+ dy y) c]))
+    [(+ dx x) (+ dy y)]))
 
 (def dead 0)
 
@@ -106,33 +106,26 @@
                                  (tree->cells se (conj path :se) cells)
                                  (tree->cells sw (conj path :sw) cells))))))
 
+(conj nil :pop)
+
 (defn base-case
   [tree survive? birth?]
-  (let [cells (reduce (fn [a {:keys [x y] :as c}]
-                        (if (nil? x)
-                          a
-                          (assoc a [x y] c))) {} (tree->cells tree))
-        ;_ (println "The cells we have" cells)
-        ;_ (pprint tree)
-
-
-        p (into #{}
-                (for [[cell [n-neighbours og-cell]] (->> (vals cells)
-                                                         (mapcat neighbours)
-                                                         (reduce (fn [f cell]
-                                                                   (if (nil? (get f [(first cell) (second cell)]))
-                                                                     (assoc f [(first cell) (second cell)] [1 (last cell)])
-                                                                     (update f [(first cell) (second cell)]
-                                                                             (fn [[a c]] [(inc a) c])))) {}))] ;; it's alive with 2 bros
-                  {:x    (first cell)
-                   :y    (second cell)
-                   :path (:path og-cell)
-                   :data {:alive? (or (= n-neighbours 3)    ;; bring back to life
-                                      (and (= n-neighbours 2)
-                                           (get-in cell [:data :alive?])))
-                          }}))]
+  (let [cells (tree->cells tree)
+        p (map (fn [cell]
+                 (let [n (->> (neighbours cell)
+                              (map (fn [ne] (q/find-leaf tree (fn [{:keys [x y]}]
+                                                                (and (= x (first ne))
+                                                                     (= y (second ne)))))))
+                              (filter (fn [c] (get-in c [:data :alive?])))
+                              count)
+                       live? (or (= n 3)
+                                 (and (= n 2)
+                                      (get-in cell [:data :alive?])))]
+                   (assoc-in cell [:data :alive?] live?))) cells)
+        ]
     ;(println "We do insert these again " p (:depth tree) (:bounds tree))
-    (let [c (reduce (fn [t cell] (assoc-in t (:path cell) cell))
+    (let [c (reduce (fn [t cell]
+                      (assoc-in t (reverse (:path cell)) cell))
                     {:depth  (:depth tree)
                      :bounds (:bounds tree)}
                     p)]
@@ -187,33 +180,13 @@
           ;; these are the 4x4 squares.
 
 
-          ;; So we arrive with {:x 4 :y 4, w: 4}
+          nw (-> (q/make-node nw nn cc ww sub-depth) next-generation-v6)
+          ne (-> (q/make-node nn ne ee cc sub-depth) next-generation-v6)
+          sw (-> (q/make-node ww cc ss sw sub-depth) next-generation-v6)
+          se (-> (q/make-node cc ee se ss sub-depth) next-generation-v6)
 
-          ;; Thus, nw should have bounds {:x 3, :y 3, :width 2, :height 2}
-          ;; nw is the square 9 -> 12 -> 36 -> 33 -> 9
-          nw (-> (q/make-node nw nn cc ww sub-depth)
-                 ;(assoc :bounds (q/nw-split b w sub-depth))
-                 next-generation-v6)
-
-          ;; ne should have bounds {:x 5, :y 3, :width 2, height :2}
-          ;; ne is the square 11 -> 14 -> 38 -> 35 -> 11
-          ne (-> (q/make-node nn ne ee cc sub-depth)
-                 ;(assoc :bounds (q/ne-split b w sub-depth))
-                 next-generation-v6)
-
-          ;; sw shouldd have bounds {:x 3 :y 5: w 2}
-          sw (-> (q/make-node ww cc ss sw sub-depth)
-                 ;(assoc :bounds (q/sw-split b w sub-depth))
-                 next-generation-v6)
-
-          ;; se should have boundd {:x 5: :y 3 :w 2}
-          se (-> (q/make-node cc ee se ss sub-depth)
-                 ;(assoc :bounds (q/se-split b w sub-depth))
-                 next-generation-v6)
-
-          ;; final should have bounds {:x 4 :y 4 :w 2}
           calc (-> (q/make-node nw ne se sw)
-                   (assoc :bounds b))
+                   (assoc :bounds (assoc b :width w)))
           ]
 
       (swap! db-v6 assoc (hash tree) calc)
@@ -225,22 +198,30 @@
 (def memo-next-generation-v6 (memoize next-generation-v6))
 
 (defn cell-generator
-  [n]
+  [n alive-cells]
   (sort (fn [a b] (compare (get-in a [:data :i])
                            (get-in b [:data :i])))
         (-> (mapv (fn [i]
                     (mapv (fn [j]
                             (let [ii (+ j (* i n))]
                               {:x j :y i :data {:i      ii
-                                                :alive? (or (= ii 18)
-                                                            (= ii 20)
-                                                            (= ii 27)
-                                                            (= ii 28)
-                                                            (= ii 35)
-                                                            )}})) (range n))
+                                                :alive? (some (fn [c] (= [j i] c)) alive-cells)}})) (range n))
                     ) (range n))
-            flatten))
-  )
+            flatten)))
+
+(defn grow-tree
+  "Grows a tree upwards, make it one depth deeper if that makes sense?"
+  [tree]
+  (let [cells (tree->cells tree)
+        deeper-tree {:depth  (inc (:depth tree))
+                     :bounds {:x     (get-in tree [:bounds :x])
+                              :y     (get-in tree [:bounds :y])
+                              :width (* 2 (get-in tree [:bounds :width]))}}]
+    ;(q/insert-cells deeper-tree cells)
+    deeper-tree
+    ))
+
+
 
 (defn ->1d
   [x y w]
@@ -252,6 +233,17 @@
    {:x 3 :y 3 :data {:i (->1d 3 3 8)}}
    {:x 4 :y 3 :data {:i (->1d 4 3 8)}}
    {:x 3 :y 4 :data {:i (->1d 3 4 8)}}])
+
+(defn step
+  [{:keys [depth world-width center cells]}]
+  (->> (cell-generator world-width cells)
+       (q/insert-cells {:depth depth :bounds {:x center :y center :width center}})
+       next-generation-v6
+       tree->cells
+       (filter (fn [{:keys [data]}]
+                 (println "Alive?" data)
+                 (:alive? data)))
+       (map (fn [{:keys [x y]}] [x y]))))
 
 (comment
   ;; 8x8    --> depth = 3
@@ -267,17 +259,6 @@
                                    :y      c
                                    :width  c
                                    :height c}}
-                     ;[
-                     ;{:x 0 :y 0 :data {:i (->1d 0 0 8)}}
-                     ;{:x 1 :y 0 :data {:i (->1d 1 0 8)}}
-                     ;{:x 1 :y 1 :data {:i (->1d 2 0 8)}}
-                     ;{:x 0 :y 1 :data {:i (->1d 0 1 8)}}
-                     ;;;
-                     ;{:x 2 :y 0 :data {:i (->1d 2 0 8)}}
-                     ;{:x 3 :y 0 :data {:i (->1d 3 0 8)}}
-                     ;{:x 3 :y 1 :data {:i (->1d 3 1 8)}}
-                     ;{:x 2 :y 1 :data {:i (->1d 2 1 8)}}
-                     ;]
                      (cell-generator cells)
                      ;glider
                      )]
@@ -287,6 +268,8 @@
         next-generation-v6
         )
     )
+
+  (pprint @db-v6)
 
 
   (reduce (fn [a {:keys [x y] :as c}]
@@ -337,7 +320,16 @@
                           :ne         {:x 1, :y 2, :data {:i 17, :alive? false}},
                           :se         {:x 1, :y 3, :data {:i 25, :alive? false}},
                           :sw         {:x 0, :y 3, :data {:i 24, :alive? false}}}}]
-    (tree->cells nw-tree)
+    ;(tree->cells nw-tree)
+    ;(reverse '(1 2 3))
+
+    (->
+      (q/insert-cells {:depth  3
+                       :bounds {:x     4
+                                :y     4
+                                :width 4}} glider)
+      grow-tree
+      )
 
     )
 

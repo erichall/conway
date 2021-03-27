@@ -12,7 +12,8 @@
                                     {:entries []}
                                     :main
                                     {:init-fn    conways-game-of-life.core/init!
-                                     :depends-on #{:shared}}
+                                     :depends-on #{:shared}
+                                     }
                                     :worker
                                     {:init-fn    conways-game-of-life.worker/init
                                      :depends-on #{:shared}

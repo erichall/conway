@@ -163,6 +163,7 @@
              (is (= (in-bounds? b {:x 6 :y 7}) false))
              (is (= (in-bounds? b {:x 1 :y 2}) false))))}
   [{:keys [x y width] :or {width 0}} cell]
+  (println x y width cell)
   (if (nil? x)
     false
     (and (>= (:x cell) (- x width))
@@ -289,6 +290,24 @@
           (assoc :ne (empty-tree {:depth next-depth}))
           (assoc :se (empty-tree {:depth next-depth}))
           (assoc :sw (empty-tree {:depth next-depth}))))))
+
+(defn find-leaf
+  "Find a leaf in a tree according to pred"
+  [tree pred]
+  (cond
+    (nil? tree) nil
+
+    (or (= (:depth tree) 0) (nil? (:depth tree)))
+    (if (pred tree)
+      tree
+      nil)
+
+    :else
+    (or (find-leaf (:nw tree) pred)
+        (find-leaf (:ne tree) pred)
+        (find-leaf (:se tree) pred)
+        (find-leaf (:sw tree) pred)))
+  )
 
 (comment
 
