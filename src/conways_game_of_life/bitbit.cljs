@@ -32,7 +32,7 @@
 
 (defn get-cell-state
   [cell]
-  (bit-shift-left cell 1))
+  (get-bit cell 0))
 
 (defn get-cell
   [view i]
@@ -46,6 +46,10 @@
   [x y w]
   (+ (* w y) x))
 
+(defn one-d->two-d
+  [i w]
+  [(Math/floor (/ i w)) (mod i w)])
+
 (def alive-mask 1)
 (defn alive?
   [cell]
@@ -53,7 +57,7 @@
 
 (defn world-width
   [view]
-  (/ (.-length view) 8))
+  (/ (.-length view) 8))                                    ;; TODO for now..
 
 (def dd [-1 0 1])
 (defn get-neighbourhood-coordinates
@@ -64,19 +68,33 @@
         :when (not (and (= dx 0) (= dy 0)))]
     [(+ x dx) (+ y dy)]))
 
-(defn decrement-neighbour
+(defn dec-neighbour
   [cell]
   (let [n (bit-shift-left (- (bit-shift-right cell 1) 1) 1)]
     (bit-xor n (get-cell-state cell))))
 
-(defn decrement-neighbours
+(defn inc-neighbour
+  [cell]
+  (let [n (bit-shift-left (+ (bit-shift-right cell 1) 1) 1)]
+    (bit-xor n (get-cell-state cell))))
+
+(defn dec-neighbours
   [view neighbours world-width]
   (reduce (fn [view neighbour]
             (let [nx (first neighbour)
                   ny (second neighbour)
                   ni (two-d->one-d nx ny world-width)]
-              (write-value view ni (decrement-neighbour (get-cell view ni))))
-            ) view neighbours))
+              (write-value view ni (dec-neighbour (get-cell view ni)))))
+          view neighbours))
+
+(defn inc-neighbours
+  [view neighbours world-width]
+  (reduce (fn [view neighbour]
+            (let [nx (first neighbour)
+                  ny (second neighbour)
+                  ni (two-d->one-d nx ny world-width)]
+              (write-value view ni (inc-neighbour (get-cell view ni)))))
+          view neighbours))
 
 (defn kill-cell
   "Set the cell state to 0 and decrement the counter for each neighbour."
@@ -84,14 +102,17 @@
   (let [w (world-width view)
         i (two-d->one-d x y w)
         neighbours (get-neighbourhood-coordinates x y)]
-    (write-value view i 0)
-    (reduce (fn [view neighbour]
-              (let [nx (first neighbour)
-                    ny (second neighbour)
-                    ni (two-d->one-d nx ny w)]
-                (write-value view ni (decrement-neighbour (get-cell view ni))))
-              ) view neighbours)
-    )
+    (-> (write-value view i 0)
+        (dec-neighbours neighbours w))))
+
+(defn awake-cell
+  "Set the cell to 1 and increment the counter for each neighbour."
+  [view x y]
+  (let [w (world-width view)
+        i (two-d->one-d x y w)
+        neighbours (get-neighbourhood-coordinates x y)]
+    (-> (write-value view i 0)
+        (inc-neighbours neighbours world-width)))
   )
 
 (defn pattern->view
@@ -104,6 +125,20 @@
               (let [i (two-d->one-d x y w)]
                 (->> (set-cell-state view 1)
                      (write-value view i)))) view pattern)))
+
+(defn view->pattern
+  "Returns the alive cells as x,y coordinates, dead ones are excluded"
+  [view]
+  (let [pattern (transient [])
+        w (world-width view)]
+    (persistent!
+      (reduce (fn [pattern i]
+                (let [s (get-cell-state (get-cell view i))]
+                  (if (= 1 s)
+                    (conj! pattern (one-d->two-d i w))
+                    pattern))
+                ) pattern (range (.-length view))))
+    ))
 
 ;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
 ;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]

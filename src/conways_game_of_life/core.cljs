@@ -223,10 +223,9 @@
 (defn init! [] (render (get-state app-state-atom)))
 (defn reload! [] (render (get-state app-state-atom)))
 
-(let [view (b/uint-8-view 512)]
-  (js/console.log (b/pattern->view (:blinker shapes) view))
-  (println (b/alive? 3))
-  (println (b/get-neighbourhood-coordinates 0 0))
+(let [view (->> (b/uint-8-view 64)
+                (b/pattern->view (:blinker shapes)))]
+  (println (b/view->pattern view))
   )
 
 (comment

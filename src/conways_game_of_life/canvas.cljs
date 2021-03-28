@@ -130,8 +130,9 @@
   (doseq [xx (range x (+ x w))]
     (doseq [yy (range y (+ y h))]
       (draw-pixel xx yy r g b a)))
-  (put-img-data @img-data-atom)
-  )
+  (put-img-data @img-data-atom))
+
+;; TODO add draw the whole grid with just one put-img-data
 
 
 (defn white-img
