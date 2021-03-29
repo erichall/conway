@@ -3,7 +3,7 @@
 (def blinker #{[1 0] [1 1] [1 2]})
 (def shapes {
              :blinker        #{[1 0] [1 1] [1 2]}
-             :blinker-offset #{[6 4] [6 5] [6 6]}
+             :blinker-offset #{[2 1] [2 2] [2 3]}
              :glider         #{[0 0] [2 0] [1 1] [1 2] [2 1]}
              :144p24         #{[8 11]
                                [17 25]

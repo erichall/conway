@@ -169,7 +169,19 @@
   (c/create-canvas 500 500)
   (c/resize-canvas)
   (c/empty-img!)
-  (c/draw-rect 20 20 50 50 123 123 123 255)
+
+  (let [view (->> (b/uint-8-view 64)
+                  (b/pattern->view (:blinker-offset shapes)))]
+
+    (b/pprint-view view)
+    (b/step view)
+    (b/pprint-view view)
+
+    (c/draw-rects view)
+    ;(println (b/step view))
+    )
+
+  ;(c/draw-rect 20 20 50 50 123 123 123 255)
 
   ;; Let's use a ArrayBuffer and a 16-bit uint16 dataView into that one.
   ;; Then, we can store the cell-state and all it's neighbours and
@@ -223,10 +235,6 @@
 (defn init! [] (render (get-state app-state-atom)))
 (defn reload! [] (render (get-state app-state-atom)))
 
-(let [view (->> (b/uint-8-view 64)
-                (b/pattern->view (:blinker shapes)))]
-  (println (b/view->pattern view))
-  )
 
 (comment
   (reset! app-state-atom initial-state)

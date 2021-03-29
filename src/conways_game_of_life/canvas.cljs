@@ -130,9 +130,32 @@
   (doseq [xx (range x (+ x w))]
     (doseq [yy (range y (+ y h))]
       (draw-pixel xx yy r g b a)))
-  (put-img-data @img-data-atom))
+  ;(put-img-data @img-data-atom)
+  )
 
-;; TODO add draw the whole grid with just one put-img-data
+(defn one-d->two-d
+  [i w]
+  [(mod i w) (Math/floor (/ i w))])
+
+(def alive-mask 1)
+(defn alive?
+  [cell]
+  (= (bit-and cell alive-mask) 1))
+
+(defn draw-rects
+  [view]
+  (doseq [i (range 0 (.-length view))]
+    (let [cell (aget view i)
+          [x y] (one-d->two-d i 8)
+          alive-color (if (alive? cell) 255 0)]
+      (draw-rect (+ (* x 50) 2)
+                 (+ (* y 50) 2)
+                 49 49
+                 alive-color alive-color alive-color alive-color)
+      )
+    )
+  (put-img-data @img-data-atom)
+  )
 
 
 (defn white-img

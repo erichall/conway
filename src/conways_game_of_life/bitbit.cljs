@@ -48,7 +48,7 @@
 
 (defn one-d->two-d
   [i w]
-  [(Math/floor (/ i w)) (mod i w)])
+  [(mod i w) (Math/floor (/ i w))])
 
 (def alive-mask 1)
 (defn alive?
@@ -98,21 +98,41 @@
 
 (defn kill-cell
   "Set the cell state to 0 and decrement the counter for each neighbour."
-  [view x y]
+  [view i]
   (let [w (world-width view)
-        i (two-d->one-d x y w)
+        [x y] (one-d->two-d i 8)                            ;; TODO the 8 width
         neighbours (get-neighbourhood-coordinates x y)]
     (-> (write-value view i 0)
         (dec-neighbours neighbours w))))
 
 (defn awake-cell
   "Set the cell to 1 and increment the counter for each neighbour."
-  [view x y]
+  [view i]
   (let [w (world-width view)
-        i (two-d->one-d x y w)
+        [x y] (one-d->two-d i 8)                            ;; TODO the 8 width
         neighbours (get-neighbourhood-coordinates x y)]
     (-> (write-value view i 0)
-        (inc-neighbours neighbours world-width)))
+        (inc-neighbours neighbours world-width))))
+
+(defn step
+  [view]
+  (doseq [i (range 0 (.-length view))]
+    (let [cell (get-cell view i)]
+      ;; off-cell with no neighbours, we just skip  this
+      (when (not= cell 0)
+        (let [c (bit-shift-right cell 1)]
+          (if (alive? cell)
+            ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
+            (when (and (not= c 2) (not= c 3))
+              (kill-cell view cell))
+            ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
+            (when (= c 3)
+              (awake-cell view i)
+              )
+            )
+          )))
+    )
+  view
   )
 
 (defn pattern->view
@@ -122,9 +142,11 @@
   [pattern view]
   (let [w (world-width view)]
     (reduce (fn [view [x y]]
-              (let [i (two-d->one-d x y w)]
-                (->> (set-cell-state view 1)
-                     (write-value view i)))) view pattern)))
+              (let [i (two-d->one-d x y w)
+                    n (get-neighbourhood-coordinates x y)
+                    v (->> (set-cell-state view 1)
+                           (write-value view i))]
+                (inc-neighbours v n w))) view pattern)))
 
 (defn view->pattern
   "Returns the alive cells as x,y coordinates, dead ones are excluded"
@@ -139,6 +161,21 @@
                     pattern))
                 ) pattern (range (.-length view))))
     ))
+
+(defn pprint-view
+  [view]
+  (let [w (into (sorted-map)
+                (second
+                  (reduce (fn [[r s] i]
+                            (if (= (mod i 8) 0)
+                              [(inc r) (assoc s (keyword (str (inc r))) (aget view i))]
+                              [r (assoc s (keyword (str r)) (str (get s (keyword (str r))) " " (aget view i)))])
+                            ) [0 {}] (range 64))))]
+    (doseq [l w]
+      (println (val l))
+      )
+    )
+  )
 
 ;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
 ;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
