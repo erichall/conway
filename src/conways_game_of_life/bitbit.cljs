@@ -116,22 +116,23 @@
 
 (defn step
   [view]
-  (doseq [i (range 0 (.-length view))]
-    (let [cell (get-cell view i)]
-      ;; off-cell with no neighbours, we just skip  this
-      (when (not= cell 0)
-        (let [c (bit-shift-right cell 1)]
-          (if (alive? cell)
-            ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
-            (when (and (not= c 2) (not= c 3))
-              (kill-cell view cell))
-            ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
-            (when (= c 3)
-              (awake-cell view i)
+  (let [tmp-view (.slice view)]                             ;; this is the not modified view that we operate with
+    (doseq [i (range 0 (.-length view))]
+      (let [cell (get-cell tmp-view i)]
+        ;; off-cell with no neighbours, we just skip  this
+        (when (not= cell 0)
+          (let [c (bit-shift-right cell 1)]
+            (if (alive? cell)
+              ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
+              (when (and (not= c 2) (not= c 3))
+                (kill-cell view cell))
+              ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
+              (when (= c 3)
+                (awake-cell view i)
+                )
               )
-            )
-          )))
-    )
+            )))
+      ))
   view
   )
 
