@@ -174,11 +174,11 @@
                   (b/pattern->view (:blinker-offset shapes)))]
 
     (b/pprint-view view)
-    ;(println "step")
-    (b/step view)
-    (b/pprint-view view)
-
-    (c/draw-rects view)
+    (-> view
+        b/step
+        b/step
+        c/draw-rects
+        )
     ;(println (b/step view))
     )
 

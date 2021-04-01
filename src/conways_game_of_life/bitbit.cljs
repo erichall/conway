@@ -92,51 +92,18 @@
 ;; 6 -> 01100 inc-n -> 01110 14
 ;; 7 -> 01110 inc-n -> 10000 16
 ;; 8 -> 10000 inc-n -> should-not-happen
+;; INC WITH ALIVE?
+;; 0 -> 00001       -> 00011 3  (1 n)
+;; 1 -> 00011       -> 00101 5  (2 n)
+;; 2 -> 00101       -> 00111 7  (3 n)
+;; 3 -> 00111       -> 01001 9  (4 n)
+;; 4 -> 01001       -> 01011 11 (5 n)
+;; 5 -> 01011       -> 01101 13 (6 n)
+;; 6 -> 01101       -> 01111 15 (7 n)
+;; 7 -> 01111       -> 10001 17 (8 n)
 (defn wrap
   [a size]
   (mod (+ a size) size))
-
-(defn dec-neighbours
-  [mutating-view fixed-view neighbours world-width]
-  (reduce (fn [mutating-view neighbour]
-            (let [nx (wrap (first neighbour) world-width)
-                  ny (wrap (second neighbour) world-width)
-                  ni (two-d->one-d nx ny world-width)
-                  cell (get-cell fixed-view ni)]
-              (write-value mutating-view ni (dec-neighbour cell))))
-          mutating-view neighbours))
-
-
-(defn inc-neighbours
-  [mutating-view fixed-view neighbours world-width]
-  (reduce (fn [mutating-view neighbour]
-            (let [nx (wrap (first neighbour) world-width)
-                  ny (wrap (second neighbour) world-width)
-                  ni (two-d->one-d nx ny world-width)]
-              (write-value mutating-view ni (inc-neighbour (get-cell fixed-view ni)))))
-          mutating-view neighbours))
-
-(defn kill-cell
-  "Set the cell state to 0 and decrement the counter for each neighbour."
-  [mutating-view fixed-view i]
-  (let [w (world-width mutating-view)
-        [x y] (one-d->two-d i w)
-        neighbours (get-neighbourhood-coordinates x y)
-        cell (get-cell fixed-view i)]
-    (-> mutating-view
-        (write-value i (bit-and cell (bit-not 0x01)))
-        (dec-neighbours fixed-view neighbours w))))
-
-(defn awake-cell
-  "Set the cell to 1 and increment the counter for each neighbour."
-  [mutating-view fixed-view i]
-  (let [w (world-width mutating-view)
-        [x y] (one-d->two-d i w)
-        neighbours (get-neighbourhood-coordinates x y)
-        cell (get-cell fixed-view i)]
-    (-> mutating-view
-        (write-value i (bit-or cell 0x01))
-        (inc-neighbours fixed-view neighbours w))))
 
 (defn pprint-view
   [view]
@@ -144,14 +111,62 @@
                 (second
                   (reduce (fn [[r s] i]
                             (if (= (mod i 8) 0)
-                              [(inc r) (assoc s (keyword (str (inc r))) (aget view i))]
-                              [r (assoc s (keyword (str r)) (str (get s (keyword (str r))) " " (aget view i)))])
+                              [(inc r) (assoc s (keyword (str (inc r))) (str " [" (bit-shift-right (aget view i) 1) ", " (get-cell-state (aget view i)) " , " (aget view i) "]"))]
+                              [r (assoc s (keyword (str r)) (str (get s (keyword (str r))) " [" (bit-shift-right (aget view i) 1) ", " (get-cell-state (aget view i)) ", " (aget view i) "]"))])
                             ) [0 {}] (range 64))))]
     (println (reduce (fn [s l] (str s (val l) "\n")) "" w))))
 
+(defn neighbour-operator
+  [mutating-view fixed-view neighbours world-width operator-fn]
+  (reduce (fn [mutating-view neighbour]
+            (let [nx (wrap (first neighbour) world-width)
+                  ny (wrap (second neighbour) world-width)
+                  ni (two-d->one-d nx ny world-width)
+                  cell (get-cell mutating-view ni)]
+              (write-value mutating-view ni (operator-fn cell))))
+          mutating-view neighbours))
+
+(defn dec-neighbours
+  [mutating-view fixed-view neighbours world-width]
+  (neighbour-operator mutating-view
+                      fixed-view
+                      neighbours
+                      world-width
+                      (fn [cell] (dec-neighbour cell))))
+
+(defn inc-neighbours
+  [mutating-view fixed-view neighbours world-width]
+  (neighbour-operator mutating-view
+                      fixed-view
+                      neighbours
+                      world-width
+                      (fn [cell] (inc-neighbour cell))))
+
+(defn kill-cell
+  "Set the cell state to 0 and decrement the counter for each neighbour."
+  [mutating-view fixed-view cell i]
+  (let [w (world-width mutating-view)
+        [x y] (one-d->two-d i w)
+        neighbours (get-neighbourhood-coordinates x y)]
+    (println "KILLING CELL " x y)
+    (-> mutating-view
+        (write-value i (bit-and cell (bit-not 0x01)))
+        (dec-neighbours fixed-view neighbours w))))
+
+(defn awake-cell
+  "Set the cell to 1 and increment the counter for each neighbour."
+  [mutating-view fixed-view cell i]
+  (let [w (world-width mutating-view)
+        [x y] (one-d->two-d i w)
+        neighbours (get-neighbourhood-coordinates x y)]
+    (println "Awaking cell " x y " and incrementing it's neighbours " neighbours)
+    (-> mutating-view
+        (write-value i (bit-or cell 0x01))
+        (inc-neighbours fixed-view neighbours w))))
 
 (defn step
   [mutating-view]
+  (println "Stepping....")
   (let [fixed-view (.slice mutating-view)]                  ;; this is the not modified view that we operate with
     (doseq [i (range 0 (.-length mutating-view))]
       (let [cell (get-cell fixed-view i)]
@@ -161,14 +176,12 @@
             (if (alive? cell)
               ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
               (when (and (not= c 2) (not= c 3))
-                (println "Kill cell" (one-d->two-d i 8))
-                (kill-cell mutating-view fixed-view i)
+                (kill-cell mutating-view fixed-view cell i)
                 (pprint-view mutating-view)
                 )
               ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
               (when (= c 3)
-                (println "Awake cell " (one-d->two-d i 8))
-                (awake-cell mutating-view fixed-view i)
+                (awake-cell mutating-view fixed-view cell i)
                 (pprint-view mutating-view)
                 )
               )
