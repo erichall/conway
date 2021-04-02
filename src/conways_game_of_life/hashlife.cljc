@@ -338,3 +338,8 @@
 
   )
 
+(bit-and 7 (bit-not 0x01))
+
+
+(bit-or 8 0x01)
+(bit-shift-left 1 1)

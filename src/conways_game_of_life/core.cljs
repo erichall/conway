@@ -56,13 +56,14 @@
   {:states [{:cell-size     10                              ;; px
              :grid-size     grid-size
              ;:grid          (:heavy shapes)
-             :grid          (:blinker-offset shapes)
+             :grid          (:blinker shapes)
              :canvas-id     "conway-canvas"
              :seed          1
              :initial-seed? false
              :running?      false
              :toroidal?     false
              :fps           0
+             :view          nil
              }]})
 
 
@@ -88,7 +89,6 @@
 (defn simulate
   ([trigger-event timestamp]
    (when (running? app-state-atom)
-
      (swap! render-atom (fn [state]
                           (let [seconds-passed (/ (- timestamp (:last-timestamp @render-atom)) 1000)]
                             (-> (assoc state :last-timestamp timestamp)
@@ -102,19 +102,8 @@
   ([name] (handle-event! name nil))
   ([name data]
    (condp = name
-     :tick (mutate! app-state-atom (fn [state]
-                                     (let [prev-grid (:grid state)
-                                           {:keys [grid-size cell-size grid] :as next-state} (tick state)
-                                           ;context @c/canvas-atom
-                                           ;worker (canvas-worker (:canvas context))
-                                           ]
-                                       ;(c/draw-cells! {:context       context
-                                       ;                :cells         (clojure.set/union grid prev-grid)
-                                       ;                :size          cell-size
-                                       ;                :cell-color-fn (fn [cell] (cell-color next-state cell))})
-                                       (if (:fps data)
-                                         (assoc next-state :fps (:fps data))
-                                         next-state))))
+     :tick (-> (b/step (:view @app-state-atom))
+               c/draw-rects)
      :seed (mutate! app-state-atom seed-grid)
      :start (do (mutate! app-state-atom (fn [state] (assoc state :running? true)))
                 (simulate handle-event!))
@@ -171,12 +160,15 @@
   (c/empty-img!)
 
   (let [view (->> (b/uint-8-view 64)
-                  (b/pattern->view (:blinker-offset shapes)))]
+                  (b/pattern->view (:grid (get-state app-state-atom))))]
 
-    (b/pprint-view view)
+    (swap! app-state-atom assoc :view view)
+
     (-> view
-        b/step
-        b/step
+        ;    b/step
+        ;    b/step
+        ;    b/step
+        ;    b/step
         c/draw-rects
         )
     ;(println (b/step view))
@@ -231,7 +223,9 @@
 
   (add-watch app-state-atom
              :game-loop
-             (fn [_ _ _ _] (render (get-state app-state-atom)))))
+             (fn [_ _ _ _]
+               ;(render (get-state app-state-atom))
+               )))
 
 (defn init! [] (render (get-state app-state-atom)))
 (defn reload! [] (render (get-state app-state-atom)))

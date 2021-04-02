@@ -142,31 +142,41 @@
                       world-width
                       (fn [cell] (inc-neighbour cell))))
 
+(defn alive-neighbours
+  [view neighbours]
+  (reduce (fn [c n]
+            (if (-> (get-cell view (two-d->one-d (first n) (second n) (world-width view)))
+                    alive?)
+              (inc c)
+              c)) 0 neighbours))
+
 (defn kill-cell
   "Set the cell state to 0 and decrement the counter for each neighbour."
   [mutating-view fixed-view cell i]
   (let [w (world-width mutating-view)
         [x y] (one-d->two-d i w)
-        neighbours (get-neighbourhood-coordinates x y)]
-    (println "KILLING CELL " x y)
+        neighbours (get-neighbourhood-coordinates x y)
+        alive-c (alive-neighbours mutating-view neighbours)]
     (-> mutating-view
         (write-value i (bit-and cell (bit-not 0x01)))
+        (write-value i (bit-shift-left alive-c 1))
         (dec-neighbours fixed-view neighbours w))))
 
 (defn awake-cell
   "Set the cell to 1 and increment the counter for each neighbour."
-  [mutating-view fixed-view cell i]
+  [mutating-view fixed-view i]
   (let [w (world-width mutating-view)
         [x y] (one-d->two-d i w)
-        neighbours (get-neighbourhood-coordinates x y)]
-    (println "Awaking cell " x y " and incrementing it's neighbours " neighbours)
+        neighbours (get-neighbourhood-coordinates x y)
+        alive-c (alive-neighbours mutating-view neighbours)]
     (-> mutating-view
-        (write-value i (bit-or cell 0x01))
+        (write-value i (bit-shift-left alive-c 1))
+        (write-value i (set-cell-state (get-cell mutating-view i) 1))
         (inc-neighbours fixed-view neighbours w))))
 
 (defn step
   [mutating-view]
-  (println "Stepping....")
+
   (let [fixed-view (.slice mutating-view)]                  ;; this is the not modified view that we operate with
     (doseq [i (range 0 (.-length mutating-view))]
       (let [cell (get-cell fixed-view i)]
@@ -176,14 +186,10 @@
             (if (alive? cell)
               ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
               (when (and (not= c 2) (not= c 3))
-                (kill-cell mutating-view fixed-view cell i)
-                (pprint-view mutating-view)
-                )
+                (kill-cell mutating-view fixed-view cell i))
               ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
               (when (= c 3)
-                (awake-cell mutating-view fixed-view cell i)
-                (pprint-view mutating-view)
-                )
+                (awake-cell mutating-view fixed-view i))
               )
             )))
       ))
