@@ -57,7 +57,7 @@
 
 (defn world-width
   [view]
-  (/ (.-length view) 8))                                    ;; TODO for now..
+  (Math/sqrt (.-length view)))
 
 (def dd [-1 0 1])
 (defn get-neighbourhood-coordinates
@@ -75,32 +75,6 @@
   [cell]
   (+ cell 2))
 
-;(println "INC 0 -> 2" (inc-neighbour 0) (bit-shift-right (inc-neighbour 0) 1))
-;(println "INC 1 -> 4" (inc-neighbour 2) (bit-shift-right (inc-neighbour 2) 1))
-;(println "INC 2 -> 6" (inc-neighbour 4) (bit-shift-right (inc-neighbour 4) 1))
-;(println "INC 3 -> 8" (inc-neighbour 6) (bit-shift-right (inc-neighbour 6) 1))
-;(println "INC 4 -> 10" (inc-neighbour 8) (bit-shift-right (inc-neighbour 8) 1))
-;(println "INC 5 -> 12" (inc-neighbour 10) (bit-shift-right (inc-neighbour 10) 1))
-;(println "INC 6 -> 14" (inc-neighbour 12) (bit-shift-right (inc-neighbour 12) 1))
-;(println "INC 7 -> 16" (inc-neighbour 14) (bit-shift-right (inc-neighbour 14) 1))
-;; 0 -> 00000 inc-n -> 00010 2
-;; 1 -> 00010 inc-n -> 00100 4
-;; 2 -> 00100 inc-n -> 00110 6
-;; 3 -> 00110 inc-n -> 01000 8
-;; 4 -> 01000 inc-n -> 01010 10
-;; 5 -> 01010 inc-n -> 01100 12
-;; 6 -> 01100 inc-n -> 01110 14
-;; 7 -> 01110 inc-n -> 10000 16
-;; 8 -> 10000 inc-n -> should-not-happen
-;; INC WITH ALIVE?
-;; 0 -> 00001       -> 00011 3  (1 n)
-;; 1 -> 00011       -> 00101 5  (2 n)
-;; 2 -> 00101       -> 00111 7  (3 n)
-;; 3 -> 00111       -> 01001 9  (4 n)
-;; 4 -> 01001       -> 01011 11 (5 n)
-;; 5 -> 01011       -> 01101 13 (6 n)
-;; 6 -> 01101       -> 01111 15 (7 n)
-;; 7 -> 01111       -> 10001 17 (8 n)
 (defn wrap
   [a size]
   (mod (+ a size) size))
@@ -110,34 +84,32 @@
   (let [w (into (sorted-map)
                 (second
                   (reduce (fn [[r s] i]
-                            (if (= (mod i 8) 0)
+                            (if (= (mod i (world-width view)) 0)
                               [(inc r) (assoc s (keyword (str (inc r))) (str " [" (bit-shift-right (aget view i) 1) ", " (get-cell-state (aget view i)) " , " (aget view i) "]"))]
                               [r (assoc s (keyword (str r)) (str (get s (keyword (str r))) " [" (bit-shift-right (aget view i) 1) ", " (get-cell-state (aget view i)) ", " (aget view i) "]"))])
-                            ) [0 {}] (range 64))))]
+                            ) [0 {}] (range (.-length view)))))]
     (println (reduce (fn [s l] (str s (val l) "\n")) "" w))))
 
 (defn neighbour-operator
-  [mutating-view fixed-view neighbours world-width operator-fn]
-  (reduce (fn [mutating-view neighbour]
+  [view neighbours world-width operator-fn]
+  (reduce (fn [view neighbour]
             (let [nx (wrap (first neighbour) world-width)
                   ny (wrap (second neighbour) world-width)
                   ni (two-d->one-d nx ny world-width)
-                  cell (get-cell mutating-view ni)]
-              (write-value mutating-view ni (operator-fn cell))))
-          mutating-view neighbours))
+                  cell (get-cell view ni)]
+              (write-value view ni (operator-fn cell))))
+          view neighbours))
 
 (defn dec-neighbours
-  [mutating-view fixed-view neighbours world-width]
-  (neighbour-operator mutating-view
-                      fixed-view
+  [view neighbours world-width]
+  (neighbour-operator view
                       neighbours
                       world-width
                       (fn [cell] (dec-neighbour cell))))
 
 (defn inc-neighbours
-  [mutating-view fixed-view neighbours world-width]
-  (neighbour-operator mutating-view
-                      fixed-view
+  [view neighbours world-width]
+  (neighbour-operator view
                       neighbours
                       world-width
                       (fn [cell] (inc-neighbour cell))))
@@ -152,30 +124,32 @@
 
 (defn kill-cell
   "Set the cell state to 0 and decrement the counter for each neighbour."
-  [mutating-view fixed-view cell i]
-  (let [w (world-width mutating-view)
+  [view cell i]
+  (let [w (world-width view)
         [x y] (one-d->two-d i w)
         neighbours (get-neighbourhood-coordinates x y)
-        alive-c (alive-neighbours mutating-view neighbours)]
-    (-> mutating-view
+        alive-c (alive-neighbours view neighbours)]
+    (-> view
         (write-value i (bit-and cell (bit-not 0x01)))
         (write-value i (bit-shift-left alive-c 1))
-        (dec-neighbours fixed-view neighbours w))))
+        (dec-neighbours neighbours w))))
 
 (defn awake-cell
   "Set the cell to 1 and increment the counter for each neighbour."
-  [mutating-view fixed-view i]
-  (let [w (world-width mutating-view)
+  [view i]
+  (let [w (world-width view)
         [x y] (one-d->two-d i w)
         neighbours (get-neighbourhood-coordinates x y)
-        alive-c (alive-neighbours mutating-view neighbours)]
-    (-> mutating-view
+        alive-c (alive-neighbours view neighbours)]
+    (-> view
         (write-value i (bit-shift-left alive-c 1))
-        (write-value i (set-cell-state (get-cell mutating-view i) 1))
-        (inc-neighbours fixed-view neighbours w))))
+        (write-value i (set-cell-state (get-cell view i) 1))
+        (inc-neighbours neighbours w))))
 
 (defn step
   [mutating-view]
+
+  ;(pprint-view mutating-view)
 
   (let [fixed-view (.slice mutating-view)]                  ;; this is the not modified view that we operate with
     (doseq [i (range 0 (.-length mutating-view))]
@@ -186,10 +160,10 @@
             (if (alive? cell)
               ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
               (when (and (not= c 2) (not= c 3))
-                (kill-cell mutating-view fixed-view cell i))
+                (kill-cell mutating-view cell i))
               ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
               (when (= c 3)
-                (awake-cell mutating-view fixed-view i))
+                (awake-cell mutating-view i))
               )
             )))
       ))
@@ -213,7 +187,7 @@
             n (get-neighbourhood-coordinates x y)
             cell (get-cell fixed-view i)]
         (when (= cell 1)
-          (inc-neighbours view view n w))
+          (inc-neighbours view n w))
         )))
   view)
 
@@ -230,15 +204,4 @@
                     pattern))
                 ) pattern (range (.-length view))))
     ))
-
-
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-;; [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000] [00000000]
-
 

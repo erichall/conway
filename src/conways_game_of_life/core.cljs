@@ -56,7 +56,7 @@
   {:states [{:cell-size     10                              ;; px
              :grid-size     grid-size
              ;:grid          (:heavy shapes)
-             :grid          (:blinker shapes)
+             :grid          (:heavy shapes)
              :canvas-id     "conway-canvas"
              :seed          1
              :initial-seed? false
@@ -159,7 +159,7 @@
   (c/resize-canvas)
   (c/empty-img!)
 
-  (let [view (->> (b/uint-8-view 64)
+  (let [view (->> (b/uint-8-view (* 64 64))
                   (b/pattern->view (:grid (get-state app-state-atom))))]
 
     (swap! app-state-atom assoc :view view)
@@ -174,40 +174,6 @@
     ;(println (b/step view))
     )
 
-  ;(c/draw-rect 20 20 50 50 123 123 123 255)
-
-  ;; Let's use a ArrayBuffer and a 16-bit uint16 dataView into that one.
-  ;; Then, we can store the cell-state and all it's neighbours and
-  ;; possible other information if we want
-  ;; we can then do
-  ;; 15 | 14 | 13 | 12 | 11 | 10 | 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
-  ;; so for example
-  ;; 0 - cell-state
-  ;; 1 2 3
-  ;; 4   5
-  ;; 6 7 8
-  ;; can be the neighbours.
-  ;; The rest can be used for something else
-  ;; SCRAP THIS!
-  ;; Let's do it like this:
-  ;; We have 8 bits for each cell:
-  ;; 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
-  ;; 0 -> cell-state 0/1
-  ;; A cell can have between 0-8 neighbours counted.
-  ;; thus,
-  ;; 0 = 0, 1, = 1, 2 = 10, 3 = 11, 4 = 100, 5 = 101, 6 = 110, 7 = 111, 8 = 1000
-  ;; thus, we need 4 bits for a counting alive neighbours,
-  ;; bit 1-4 -> alive cell count
-  ;; So for each generation we do
-  ;; We find a cell that is either on or has on neighbours.
-  ;;  we check if that cell is on:
-  ;;      if it does not have 2 or 3 alive neighbours, we turn it off
-  ;;      to turn it off:
-  ;;        turn the cell of
-  ;;        decrement the count for the 8 neighbours
-  ;;  otherwise the cell is off
-  ;;    first check if it has exactly 3 alive neighbours, if so:
-  ;;        increment the count for the 8 neighbours
 
   (rd/render [game-of-life {:state         state
                             :trigger-event handle-event!}]

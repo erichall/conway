@@ -144,16 +144,17 @@
 
 (defn draw-rects
   [view]
-  (doseq [i (range 0 (.-length view))]
-    (let [cell (aget view i)
-          [x y] (one-d->two-d i 8)
-          alive-color (if (alive? cell) 255 0)]
-      (draw-rect (+ (* x 50) 2)
-                 (+ (* y 50) 2)
-                 49 49
-                 alive-color alive-color alive-color alive-color)
-      )
-    )
+  (let [w (Math/sqrt (.-length view))]
+    (doseq [i (range 0 (.-length view))]
+      (let [cell (aget view i)
+            [x y] (one-d->two-d i w)
+            alive-color (if (alive? cell) 255 0)]
+        (draw-rect (+ (* x 6) 2)
+                   (+ (* y 6) 2)
+                   5 5
+                   alive-color alive-color alive-color alive-color)
+        )
+      ))
   (put-img-data @img-data-atom)
   )
 
