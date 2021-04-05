@@ -155,11 +155,11 @@
 (defn render
   [state]
 
-  (c/create-canvas 500 500)
+  (c/create-canvas 4096 4096)
   (c/resize-canvas)
   (c/empty-img!)
 
-  (let [view (->> (b/uint-8-view (* 64 64))
+  (let [view (->> (b/uint-8-view (* 32 32))
                   (b/pattern->view (:grid (get-state app-state-atom))))]
 
     (swap! app-state-atom assoc :view view)

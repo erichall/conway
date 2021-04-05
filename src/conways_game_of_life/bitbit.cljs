@@ -96,7 +96,13 @@
             (let [nx (wrap (first neighbour) world-width)
                   ny (wrap (second neighbour) world-width)
                   ni (two-d->one-d nx ny world-width)
-                  cell (get-cell view ni)]
+                  cell (get-cell view ni)
+                  op (operator-fn cell)]
+
+              (when (= op 257)
+                (println "WTF?? " cell nx ny ni cell neighbour)
+                )
+
               (write-value view ni (operator-fn cell))))
           view neighbours))
 
@@ -117,10 +123,13 @@
 (defn alive-neighbours
   [view neighbours]
   (reduce (fn [c n]
-            (if (-> (get-cell view (two-d->one-d (first n) (second n) (world-width view)))
-                    alive?)
-              (inc c)
-              c)) 0 neighbours))
+            (let [w (world-width view)
+                  x (wrap (first n) w)
+                  y (wrap (second n) w)]
+              (if (-> (get-cell view (two-d->one-d x y w))
+                      alive?)
+                (inc c)
+                c))) 0 neighbours))
 
 (defn kill-cell
   "Set the cell state to 0 and decrement the counter for each neighbour."
@@ -130,8 +139,7 @@
         neighbours (get-neighbourhood-coordinates x y)
         alive-c (alive-neighbours view neighbours)]
     (-> view
-        (write-value i (bit-and cell (bit-not 0x01)))
-        (write-value i (bit-shift-left alive-c 1))
+        (write-value i (set-cell-state (bit-shift-left alive-c 1) 0))
         (dec-neighbours neighbours w))))
 
 (defn awake-cell
@@ -142,13 +150,13 @@
         neighbours (get-neighbourhood-coordinates x y)
         alive-c (alive-neighbours view neighbours)]
     (-> view
-        (write-value i (bit-shift-left alive-c 1))
-        (write-value i (set-cell-state (get-cell view i) 1))
+        (write-value i (set-cell-state (bit-shift-left alive-c 1) 1))
         (inc-neighbours neighbours w))))
 
 (defn step
   [mutating-view]
 
+  ;(println "A step..")
   ;(pprint-view mutating-view)
 
   (let [fixed-view (.slice mutating-view)]                  ;; this is the not modified view that we operate with

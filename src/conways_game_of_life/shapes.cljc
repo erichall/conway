@@ -209,8 +209,8 @@
                                [24 72]
                                [35 106]
                                [25 63]}
-             :heavy          (set (for [x (range 0 32)
-                                        y (range 0 32)]
-                                    [x y]))
+             :heavy          (for [x (range 0 150)
+                                   y (range 0 150)]
+                               [x y])
              })
 

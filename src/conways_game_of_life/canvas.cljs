@@ -149,9 +149,9 @@
       (let [cell (aget view i)
             [x y] (one-d->two-d i w)
             alive-color (if (alive? cell) 255 0)]
-        (draw-rect (+ (* x 6) 2)
-                   (+ (* y 6) 2)
-                   5 5
+        (draw-rect (+ (* x 4) 2)
+                   (+ (* y 4) 2)
+                   3 3
                    alive-color alive-color alive-color alive-color)
         )
       ))
