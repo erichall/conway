@@ -134,15 +134,22 @@
   (range s (+ s e)))
 ;(def memo-get-range (memoize get-range))
 
+(defn a-loop
+  [arr expr]
+  (let [l (count arr)]
+    (loop [i 0]
+      (when (< i l)
+        (recur (inc i) expr)))))
+
 (defn draw-rect
   [x y w h r g b a]
   (let [canvas-width (width)
         img-data @img-data-atom]
-    (doseq [xx (range x (+ x w))]
-      (doseq [yy (range y (+ y h))]
-        (draw-pixel xx yy r g b a canvas-width
-                    img-data
-                    )))))
+    (a-loop (range x (+ x w))
+            (fn draw-rect-xx [xx]
+              (a-loop (range y (+ y h))
+                      (fn [yy]
+                        (draw-pixel xx yy r g b a canvas-width img-data)))))))
 
 (defn one-d->two-d
   [i w]
