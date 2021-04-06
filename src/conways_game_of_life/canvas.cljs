@@ -16,7 +16,9 @@
       ctx)))
 
 (defn- width [] (aget @ctx-atom "canvas" "width"))
+(def memo-width (memoize width))
 (defn- height [] (aget @ctx-atom "canvas" "height"))
+
 
 (defn get-canvas-id [] (aget @ctx-atom "canvas" "id"))
 (defn canvas [] (aget @ctx-atom "canvas"))
@@ -116,22 +118,31 @@
   [img-data]
   (.putImageData @ctx-atom img-data 0 0))
 
+(defn pixel-offset-index [x y w] (* (+ x (* y w)) 4))
+;(def memo-pixel-offset-index (memoize pixel-offset-index))
+
 (defn draw-pixel
-  [x y r g b a]
-  (let [i (* (+ x (* y (width))) 4)
-        img-data @img-data-atom]
+  [x y r g b a w img-data]
+  (let [i (pixel-offset-index x y w)]
     (aset img-data "data" (+ i 0) r)
     (aset img-data "data" (+ i 1) g)
     (aset img-data "data" (+ i 2) b)
     (aset img-data "data" (+ i 3) a)))
 
+(defn get-range
+  [s e]
+  (range s (+ s e)))
+;(def memo-get-range (memoize get-range))
+
 (defn draw-rect
   [x y w h r g b a]
-  (doseq [xx (range x (+ x w))]
-    (doseq [yy (range y (+ y h))]
-      (draw-pixel xx yy r g b a)))
-  ;(put-img-data @img-data-atom)
-  )
+  (let [canvas-width (width)
+        img-data @img-data-atom]
+    (doseq [xx (range x (+ x w))]
+      (doseq [yy (range y (+ y h))]
+        (draw-pixel xx yy r g b a canvas-width
+                    img-data
+                    )))))
 
 (defn one-d->two-d
   [i w]
@@ -143,21 +154,18 @@
   (= (bit-and cell alive-mask) 1))
 
 (defn draw-rects
-  [view]
-  (let [w (Math/sqrt (.-length view))]
-    (doseq [i (range 0 (.-length view))]
-      (let [cell (aget view i)
-            [x y] (one-d->two-d i w)
-            alive-color (if (alive? cell) 255 0)]
-        (draw-rect (+ (* x 4) 2)
-                   (+ (* y 4) 2)
-                   3 3
-                   alive-color alive-color alive-color alive-color)
-        )
-      ))
+  [view width size]
+  (areduce view i _ 0
+           (let [cell (aget view i)
+                 [x y] (one-d->two-d i width)
+                 alive-color (if (alive? cell) 255 0)]
+             (draw-rect (+ (* x size) 2)
+                        (+ (* y size) 2)
+                        (- size 1) (- size 1)
+                        alive-color alive-color alive-color alive-color))
+           )
   (put-img-data @img-data-atom)
-  )
-
+  view)
 
 (defn white-img
   []

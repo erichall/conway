@@ -96,13 +96,7 @@
             (let [nx (wrap (first neighbour) world-width)
                   ny (wrap (second neighbour) world-width)
                   ni (two-d->one-d nx ny world-width)
-                  cell (get-cell view ni)
-                  op (operator-fn cell)]
-
-              (when (= op 257)
-                (println "WTF?? " cell nx ny ni cell neighbour)
-                )
-
+                  cell (get-cell view ni)]
               (write-value view ni (operator-fn cell))))
           view neighbours))
 
@@ -160,21 +154,22 @@
   ;(pprint-view mutating-view)
 
   (let [fixed-view (.slice mutating-view)]                  ;; this is the not modified view that we operate with
-    (doseq [i (range 0 (.-length mutating-view))]
-      (let [cell (get-cell fixed-view i)]
-        ;; off-cell with no neighbours, we just skip  this
-        (when (not= cell 0)
-          (let [c (bit-shift-right cell 1)]
-            (if (alive? cell)
-              ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
-              (when (and (not= c 2) (not= c 3))
-                (kill-cell mutating-view cell i))
-              ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
-              (when (= c 3)
-                (awake-cell mutating-view i))
-              )
-            )))
-      ))
+    (areduce mutating-view i _ 0
+             (let [cell (get-cell fixed-view i)]
+               ;; off-cell with no neighbours, we just skip  this
+               (when (not= cell 0)
+                 (let [c (bit-shift-right cell 1)]
+                   (if (alive? cell)
+                     ;; it's alive, we should kill it if it does not have 2 or 3 neighbours
+                     (when (and (not= c 2) (not= c 3))
+                       (kill-cell mutating-view cell i))
+                     ;; otherwise the cell is off, it should turn on if it has 3 alive neighbours
+                     (when (= c 3)
+                       (awake-cell mutating-view i))
+                     )
+                   )))
+             )
+    )
   ;; return the mutated view
   mutating-view
   )
