@@ -26,12 +26,13 @@
 (defonce app-state-atom (atom nil))
 (def grid-size 160)                                         ;; px
 (def initial-state
-  {:states [{:cell-size   10                                ;; px
+  {:states [{:cell-size   2                                 ;; px
              :grid-size   grid-size
              :grid        (:heavy shapes)
              ;:grid        (:glider shapes)
              ;:grid        (:131c31climber shapes)
-             :world-width 128
+             ;:grid        (:144p24 shapes)
+             :world-width 512
              :seed        1
              :running?    false
              :toroidal?   false
@@ -112,14 +113,18 @@
 (defn render
   [{:keys [world-width cell-size] :as state}]
 
-  (c/create-canvas 804 804)
+  (c/create-canvas 1024 1024)
   (c/resize-canvas)
-  (c/empty-img!)
+  ;(c/empty-img!)
+
+  ;(println js/window.he)
 
   (let [view (->> (b/uint-8-view (* world-width world-width))
                   (b/pattern->view (:grid (get-state app-state-atom))))]
 
     (mutate! app-state-atom (fn [state] (assoc state :view view)))
+
+    (c/stroke-style "#fff")
 
     (-> view
         ;    b/step

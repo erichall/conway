@@ -10,3 +10,4 @@ It contains really three things; A plain functional implementation that works, i
 memoization algorithm [Hashlife](https://en.wikipedia.org/wiki/Hashlife) which I've so far failed at. The last flavour of the automaton is a 
 version that deals with bitshifting and mutation on native js arrays. It's a pain to understand and makes for some ugly code, but is rather fast!
 
+In its still incomplete state, it can be viewed [here](https://gol.erkanp.dev/)

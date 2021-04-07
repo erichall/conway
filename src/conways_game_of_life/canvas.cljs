@@ -31,6 +31,9 @@
         x (- (.-clientX js-event) (.-left rect))
         y (- (.-clientY js-event) (.-top rect))]
     {:x x :y y}))
+(defn scale
+  [x-scale y-scale]
+  (.scale @ctx-atom x-scale y-scale))
 
 (defn resize-canvas
   []
@@ -46,8 +49,7 @@
       (set! (.-height canvas) d-height)
       (set! (.-width canvas) d-width)
 
-      (.scale @ctx-atom css-to-real-pixels css-to-real-pixels)
-      )))
+      (scale css-to-real-pixels css-to-real-pixels))))
 
 (defn- create-dom-canvas!
   [width height id target]
@@ -116,7 +118,19 @@
 
 (defn put-img-data
   [img-data]
-  (.putImageData @ctx-atom img-data 0 0))
+  (.putImageData @ctx-atom
+                 img-data
+                 0                                          ;; x
+                 0                                          ;; y
+                 ;; dirty-x
+                 ;; dirty-y
+                 ;; dirty-width
+                 ;; dirty-height
+                 ))
+
+(defn draw-image
+  [img x y]
+  (.drawImage @ctx-atom img x y))
 
 (defn pixel-offset-index [x y w] (* (+ x (* y w)) 4))
 ;(def memo-pixel-offset-index (memoize pixel-offset-index))
@@ -154,18 +168,42 @@
   [cell]
   (= (bit-and cell alive-mask) 1))
 
+(defn rect
+  [x y w h & opt]
+  (doto @ctx-atom
+    begin-path
+    (js-rect x y w h)
+    js-fill
+    )
+
+  (js-stroke @ctx-atom)
+  )
+
+(defn clear-canvas
+  []
+  (.clearRect @ctx-atom 0 0 (width) (height)))
+
 (defn draw-rects
   [view width size]
+
+  (clear-canvas)
+
+  (fill-style "#fff")
+
   (areduce view i _ 0
            (let [cell (aget view i)
                  [x y] (one-d->two-d i width)
                  alive-color (if (alive? cell) 255 0)]
-             (draw-rect (+ (* x size) 2)
-                        (+ (* y size) 2)
-                        (- size 1) (- size 1)
-                        alive-color alive-color alive-color alive-color))
+             (when (alive? cell)
+               (rect (* x (+ size 1)) (* y (+ size 1)) size size {:fill "#fff"})
+               )
+             ;(draw-rect (+ (* x size) 2)
+             ;           (+ (* y size) 2)
+             ;           (- size 1) (- size 1)
+             ;           alive-color alive-color alive-color alive-color)
+             )
            )
-  (put-img-data @img-data-atom)
+  ;(put-img-data @img-data-atom)
   view)
 
 (defn white-img
@@ -174,35 +212,25 @@
     (doseq [i (range (.-length (.-data canvas-data)))]
       (aset canvas-data "data" i 255))))
 
+(defn create-img-data
+  ([] (create-img-data nil))
+  ([{:keys [width height] :or {width (width) height (height)}}]
+   (.createImageData @ctx-atom width height)))
+
 (defn empty-img!
   []
-  (let [ctx @ctx-atom
-        img-data (.createImageData ctx (width) (height))]
+  (let [img-data (create-img-data)]
     (reset! img-data-atom img-data)
     (put-img-data img-data)))
 
 
-(defn clear-canvas
-  []
-  (.clearRect @ctx-atom 0 0 (width) (height)))
 
 (defn fill
   []
   (js-fill @ctx-atom))
 
 ;; shapes
-(defn rect
-  [x y w h & opt]
-  (doto @ctx-atom
-    begin-path
-    (js-rect x y w h))
-  (when (get-in opt [0 :fill?])
-    (js-fill @ctx-atom))
 
-  ;; default stroke if not batching
-  (when-not (get-in opt [0 :batch?])
-    (js-stroke @ctx-atom))
-  )
 
 (defn line
   [x1 y1 x2 y2]

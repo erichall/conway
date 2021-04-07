@@ -186,12 +186,12 @@
                               (write-value view i)))) view pattern)
         fixed-view (.slice view)]
     (doseq [i (range (.-length view))]
-      (let [[x y] (one-d->two-d i w)
-            n (get-neighbourhood-coordinates x y)
-            cell (get-cell fixed-view i)]
+      (let [cell (get-cell fixed-view i)]
         (when (= cell 1)
-          (inc-neighbours view n w))
-        )))
+          (let [[x y] (one-d->two-d i w)
+                n (get-neighbourhood-coordinates x y)]
+            (inc-neighbours view n w))
+          ))))
   view)
 
 (defn view->pattern
