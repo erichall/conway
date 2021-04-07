@@ -32,7 +32,7 @@
              ;:grid        (:glider shapes)
              ;:grid        (:131c31climber shapes)
              ;:grid        (:144p24 shapes)
-             :world-width 512
+             :world-width 256
              :seed        1
              :running?    false
              :toroidal?   false
