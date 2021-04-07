@@ -28,11 +28,11 @@
 (def initial-state
   {:states [{:cell-size   2                                 ;; px
              :grid-size   grid-size
-             :grid        (:heavy shapes)
+             ;:grid        (:heavy shapes)
              ;:grid        (:glider shapes)
-             ;:grid        (:131c31climber shapes)
+             :grid        (:131c31climber shapes)
              ;:grid        (:144p24 shapes)
-             :world-width 256
+             :world-width 128
              :seed        1
              :running?    false
              :toroidal?   false
