@@ -4,9 +4,10 @@
     [conways-game-of-life.bitbit :as b]
     [conways-game-of-life.canvas :as c]
     [conways-game-of-life.shapes :refer [shapes]]
-    [conways-game-of-life.view :refer [game-of-life cell-color]]
+    [conways-game-of-life.view :refer [game-of-life cell-color top-bar]]
     [conways-game-of-life.gol :refer [inc-grid]]
     [conways-game-of-life.hashlife :as hl]
+    [conways-game-of-life.pattern-core :as pc]
     [conways-game-of-life.util :refer [random-int
                                        get-state
                                        set-initial-shape
@@ -26,18 +27,20 @@
 (defonce app-state-atom (atom nil))
 (def grid-size 160)                                         ;; px
 (def initial-state
-  {:states [{:cell-size   2                                 ;; px
-             :grid-size   grid-size
+  {:states [{:cell-size    2                                ;; px
+             :grid-size    grid-size
              ;:grid        (:heavy shapes)
              ;:grid        (:glider shapes)
-             :grid        (:131c31climber shapes)
+             :grid         (:131c31climber shapes)
+             :current-grid :131c31climber
              ;:grid        (:144p24 shapes)
-             :world-width 128
-             :seed        1
-             :running?    false
-             :toroidal?   false
-             :fps         0
-             :view        nil
+             :shapes       shapes
+             :world-width  128
+             :seed         1
+             :running?     false
+             :toroidal?    false
+             :fps          0
+             :view         nil
              }]})
 
 
@@ -75,13 +78,30 @@
 (defn handle-event!
   ([name] (handle-event! name nil))
   ([name data]
-   (let [{:keys [world-width cell-size view]} (get-state app-state-atom)]
+   (let [{:keys [running? world-width cell-size view] :as s} (get-state app-state-atom)]
      (condp = name
+       :pattern-change (let [pattern (get shapes (keyword (:pattern data)))
+                             view (->> (b/uint-8-view (* world-width world-width))
+                                       (b/pattern->view (if (string? pattern)
+                                                          (pc/rle-pattern->coords pattern)
+                                                          pattern)))]
+                         (mutate! app-state-atom (fn [state]
+                                                   (-> state
+                                                       (assoc :running? false)
+                                                       (assoc :current-grid (keyword (:pattern data)))
+                                                       (assoc :view view))))
+                         (c/clear-canvas)
+                         (c/draw-rects view world-width cell-size)
+                         (rd/render [top-bar {:state         (get-state app-state-atom)
+                                              :trigger-event handle-event!}]
+                                    (. js/document (getElementById "app")))
+                         )
        :tick (let [v (-> (b/step view)
                          (c/draw-rects world-width cell-size))]
                (mutate! app-state-atom (fn view-swap [state] (assoc state :view v))))
-       :start (do (mutate! app-state-atom (fn [state] (assoc state :running? true)))
-                  (simulate handle-event!))
+       :start (when-not running?
+                (do (mutate! app-state-atom (fn [state] (assoc state :running? true)))
+                    (simulate handle-event!)))
        :stop (mutate! app-state-atom (fn [state] (assoc state :running? false)))
        :toggle-cell (mutate! app-state-atom (fn [{:keys [grid] :as state}]
                                               (let [cell (:cell data)]
@@ -113,43 +133,29 @@
 (defn render
   [{:keys [world-width cell-size] :as state}]
 
-  (c/create-canvas 1024 1024)
+  (c/create-canvas 400 400)
   (c/resize-canvas)
-  ;(c/empty-img!)
 
-  ;(println js/window.he)
-
-  (let [view (->> (b/uint-8-view (* world-width world-width))
-                  (b/pattern->view (:grid (get-state app-state-atom))))]
+  (let [grid (:grid (get-state app-state-atom))
+        view (->> (b/uint-8-view (* world-width world-width))
+                  (b/pattern->view grid))]
 
     (mutate! app-state-atom (fn [state] (assoc state :view view)))
 
     (c/stroke-style "#fff")
+    (c/fill-style "#fff")
 
-    (-> view
-        ;    b/step
-        ;    b/step
-        ;    b/step
-        ;    b/step
-        (c/draw-rects world-width cell-size)
-        )
-    ;(println (b/step view))
-    )
+    (c/draw-rects view world-width cell-size))
 
 
-  (rd/render [game-of-life {:state         state
-                            :trigger-event handle-event!}]
+  (rd/render [top-bar {:state         state
+                       :trigger-event handle-event!}]
              (. js/document (getElementById "app"))))
 
 (when (nil? @app-state-atom)
-  (reset! app-state-atom initial-state)
+  (reset! app-state-atom initial-state))
 
 
-  (add-watch app-state-atom
-             :game-loop
-             (fn [_ _ _ _]
-               ;(render (get-state app-state-atom))
-               )))
 
 (defn init! [] (render (get-state app-state-atom)))
 (defn reload! [] (render (get-state app-state-atom)))

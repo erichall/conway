@@ -51,6 +51,12 @@
 
       (scale css-to-real-pixels css-to-real-pixels))))
 
+(defn set-canvas-wh!
+  [w h]
+  (let [canvas (.-canvas @ctx-atom)]
+    (.setAttribute canvas "height" h)
+    (.setAttribute canvas "width" w)))
+
 (defn- create-dom-canvas!
   [width height id target]
   (let [canvas? (js-invoke js/document "getElementById" id)]
@@ -58,8 +64,8 @@
       (let [canvas (js/document.createElement "canvas")]
         (do
           (.setAttribute canvas "id" id)
-          (.setAttribute canvas "height" (str height "px"))
-          (.setAttribute canvas "width" (str width "px"))
+          (.setAttribute canvas "height" height)
+          (.setAttribute canvas "width" width)
           (.appendChild target canvas))
         canvas))))
 
@@ -71,6 +77,13 @@
      (reset! ctx-atom (.getContext canvas "2d" (clj->js "alpha" false)))
 
      (aset canvas "style" "background" color)
+     ;; center it
+     (aset canvas "style" "position" "absolute")
+     (aset canvas "style" "top" "0")
+     (aset canvas "style" "bottom" "0")
+     (aset canvas "style" "left" "0")
+     (aset canvas "style" "right" "0")
+     (aset canvas "style" "margin" "auto")
 
      ;; TODO is this the only way to not blurr lines...?!?!?
      (.setTransform @ctx-atom 1, 0, 0, 1, 0.5, 0.5)
@@ -188,22 +201,12 @@
 
   (clear-canvas)
 
-  (fill-style "#fff")
 
   (areduce view i _ 0
            (let [cell (aget view i)
-                 [x y] (one-d->two-d i width)
-                 alive-color (if (alive? cell) 255 0)]
+                 [x y] (one-d->two-d i width)]
              (when (alive? cell)
-               (rect (* x (+ size 1)) (* y (+ size 1)) size size {:fill "#fff"})
-               )
-             ;(draw-rect (+ (* x size) 2)
-             ;           (+ (* y size) 2)
-             ;           (- size 1) (- size 1)
-             ;           alive-color alive-color alive-color alive-color)
-             )
-           )
-  ;(put-img-data @img-data-atom)
+               (rect (* x (+ size 1)) (* y (+ size 1)) size size {:fill "#fff"}))))
   view)
 
 (defn white-img

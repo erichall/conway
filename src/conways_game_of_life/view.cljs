@@ -38,4 +38,31 @@
 
     [:span {:style {:margin-left "20px"}} (:fps state) " fps"]]])
 
+(defn top-bar
+  [{:keys [state trigger-event]}]
+  [:div
+   {:style {:width            (aget js/window "innerWidth")
+            :height           "30px"
+            :display          "flex"
+            :align-items      "center"
+            :padding-left     "10px"
+            :background-color "gray"
+            }}
+   [:button {:on-click (fn [] (trigger-event :tick))} "tick"]
+   [:button {:on-click (fn [] (trigger-event :start))} "start"]
+   [:button {:on-click (fn [] (trigger-event :stop))} "stop"]
+   [:select {:on-change (fn [e] (trigger-event :pattern-change {:pattern (aget e "target" "value")}))
+             :value     (:current-grid state)}
+    (map (fn [shape]
+           (let [k (key shape)]
+             [:option {:value         k
+                       :key           k
+                       } k])
+           ) (:shapes state))
+    ]
+
+   ]
+
+  )
+
 
